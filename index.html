@@ -32,6 +32,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .tab-pane.active{display:block;}
 main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 .error-bar{display:none;background:#140608;border:1px solid var(--red);color:#ff8fa3;font-family:var(--mono);font-size:11px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
+.info-bar{display:none;background:#0a1a10;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:11px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
 .stats-row,.am-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
 .stat{background:var(--bg2);border:1px solid var(--border);padding:18px 20px;border-radius:3px;position:relative;overflow:hidden;}
 .stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:var(--accent);opacity:0.5;}
@@ -93,6 +94,13 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 .mini-bar-wrap{display:flex;align-items:center;gap:8px;}
 .mini-bar-bg{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;min-width:60px;}
 .mini-bar-fill{height:100%;border-radius:2px;background:var(--purple);}
+.scanning-state{padding:48px;text-align:center;}
+.scanning-spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.scanning-title{font-family:var(--mono);font-size:13px;color:var(--green);margin-bottom:8px;}
+.scanning-sub{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.rescan-btn{background:none;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:10px;padding:6px 16px;cursor:pointer;border-radius:2px;margin-top:16px;transition:all 0.2s;}
+.rescan-btn:hover{background:var(--green);color:var(--bg);}
 .skel{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg2) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.3s infinite;border-radius:3px;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .fade{animation:fadeUp 0.35s ease both;}
@@ -116,7 +124,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     <span class="brand-name">NIGHTHAWK <em>/</em> OPS</span>
   </div>
   <div class="header-right">
-    <div class="period-tag" id="period-label">Jun 2024 → present</div>
+    <div class="period-tag" id="period-label">Last 12 months</div>
     <button class="refresh-btn" onclick="reloadActive()">↺ REFRESH</button>
   </div>
 </header>
@@ -160,53 +168,43 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 <div class="tab-pane" id="tab-audiomoth">
 <main>
   <div class="error-bar" id="am-error"></div>
-  <div class="am-stats" id="am-stats">
-    <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
-    <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
-  </div>
-  <div class="panel">
-    <div class="panel-head">
-      <span class="panel-title">Active Units Per Day</span>
-      <span style="font-family:var(--mono);font-size:9px;color:var(--muted)">Each cell = 1 day · colour intensity = unit count · hover for details</span>
+  <div class="info-bar" id="am-info"></div>
+  <div id="am-content">
+    <div class="am-stats" id="am-stats">
+      <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+      <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
     </div>
-    <div class="panel-body">
-      <div class="heatmap-wrap"><div id="heatmap" class="heatmap-grid"></div></div>
-      <div class="hm-legend">
-        <span>0 units</span>
-        <div class="hm-swatch" style="background:#111820"></div>
-        <div class="hm-swatch" style="background:#0d3a2a"></div>
-        <div class="hm-swatch" style="background:#0d6644"></div>
-        <div class="hm-swatch" style="background:#1a9e6a"></div>
-        <div class="hm-swatch" style="background:#3dffa0"></div>
-        <span>max units</span>
+    <div class="panel"><div class="panel-head"><span class="panel-title">Active Units Per Day</span></div>
+      <div class="panel-body"><div class="heatmap-wrap"><div id="heatmap" class="heatmap-grid"></div></div>
+        <div class="hm-legend"><span>0 units</span>
+          <div class="hm-swatch" style="background:#111820"></div><div class="hm-swatch" style="background:#0d3a2a"></div>
+          <div class="hm-swatch" style="background:#0d6644"></div><div class="hm-swatch" style="background:#1a9e6a"></div>
+          <div class="hm-swatch" style="background:#3dffa0"></div><span>max units</span>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="grid2">
-    <div class="panel">
-      <div class="panel-head"><span class="panel-title">Monthly Summary</span></div>
-      <div class="panel-body" style="padding:0">
-        <table class="mo-table">
-          <thead><tr><th>Month</th><th>Units Active</th><th>Recordings</th><th>Data</th></tr></thead>
-          <tbody id="mo-tbody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Loading…</td></tr></tbody>
-        </table>
+    <div class="grid2">
+      <div class="panel"><div class="panel-head"><span class="panel-title">Monthly Summary</span></div>
+        <div class="panel-body" style="padding:0">
+          <table class="mo-table"><thead><tr><th>Month</th><th>Units Active</th><th>Recordings</th><th>Data</th></tr></thead>
+          <tbody id="mo-tbody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Loading…</td></tr></tbody></table>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-head"><span class="panel-title">Daily Upload Volume</span></div>
+        <div class="panel-body"><div class="chart-wrap"><canvas id="volume-chart"></canvas></div></div>
       </div>
     </div>
     <div class="panel">
-      <div class="panel-head"><span class="panel-title">Daily Upload Volume</span></div>
-      <div class="panel-body"><div class="chart-wrap"><canvas id="volume-chart"></canvas></div></div>
-    </div>
-  </div>
-  <div class="panel">
-    <div class="panel-head">
-      <span class="panel-title">Unit Registry</span>
-      <span style="font-family:var(--mono);font-size:9px;color:var(--muted)" id="unit-count-label"></span>
-    </div>
-    <div style="overflow-x:auto">
-      <table class="unit-table">
-        <thead><tr><th>Unit</th><th>Status</th><th>First Deployed</th><th>Last Active</th><th>Active Days</th><th>Recordings</th><th>Data Volume</th></tr></thead>
-        <tbody id="unit-tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Loading…</td></tr></tbody>
-      </table>
+      <div class="panel-head"><span class="panel-title">Unit Registry</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--muted)" id="unit-count-label"></span>
+          <button class="rescan-btn" onclick="triggerRescan()">↺ RESCAN</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="unit-table"><thead><tr><th>Unit</th><th>Status</th><th>First Deployed</th><th>Last Active</th><th>Active Days</th><th>Recordings</th><th>Data Volume</th></tr></thead>
+        <tbody id="unit-tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Loading…</td></tr></tbody></table>
+      </div>
     </div>
   </div>
 </main>
@@ -215,7 +213,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 <script>
 const API=(window.API_BASE||'')+'/api';
 const PAL=['#00d4ff','#3dffa0','#ffb830','#ff4d6d','#b57aff','#ff6b35','#06d6a0','#f4a261','#a8dadc','#e9c46a'];
-let trendChart=null,volumeChart=null,amLoaded=false;
+let trendChart=null,volumeChart=null,amLoaded=false,scanPollTimer=null;
 
 function switchTab(name,btn){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
@@ -235,31 +233,33 @@ function fmtBytes(b){
   if(b>=1e6)  return (b/1e6).toFixed(1)+' MB';
   return (b/1e3).toFixed(0)+' KB';
 }
-async function get(p){const r=await fetch(API+p);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
+async function get(p){const r=await fetch(API+p);if(!r.ok&&r.status!==202)throw new Error('HTTP '+r.status);return{status:r.status,data:await r.json()};}
 function showErr(id,msg){const el=document.getElementById(id);el.style.display='block';el.textContent='⚠ '+msg;}
+function showInfo(id,msg){const el=document.getElementById(id);el.style.display='block';el.textContent=msg;}
+function hideInfo(id){document.getElementById(id).style.display='none';}
 
 // ── COSTS ──
 async function loadCosts(){
   document.getElementById('cost-error').style.display='none';
   try{
-    const[summary,forecast,services,trend]=await Promise.all([get('/summary'),get('/forecast'),get('/services'),get('/trend')]);
-    renderCostStats(summary,forecast);renderProjects(summary.projects);
-    renderSvcBars(services.services);renderTrendChart(trend);
-    document.getElementById('period-label').textContent=summary.period.start.slice(0,7)+' → '+summary.period.end.slice(0,7);
+    const[s,f,sv,tr]=await Promise.all([get('/summary'),get('/forecast'),get('/services'),get('/trend')]);
+    renderCostStats(s.data,f.data);renderProjects(s.data.projects);
+    renderSvcBars(sv.data.services);renderTrendChart(tr.data);
+    document.getElementById('period-label').textContent=s.data.period.start.slice(0,7)+' → '+s.data.period.end.slice(0,7);
   }catch(e){showErr('cost-error',e.message);}
 }
 function renderCostStats(summary,forecast){
   const projects=summary.projects,names=Object.keys(projects);
   const total=names.reduce((s,k)=>s+projects[k].total,0),top=names[0]||'—';
   document.getElementById('cost-stats').innerHTML=`
-    <div class="stat fade"><div class="stat-label">Total · Jun 2024–Now</div><div class="stat-val">${fmt(total)}</div><div class="stat-sub">${names.length} projects</div></div>
+    <div class="stat fade"><div class="stat-label">Total · Period</div><div class="stat-val">${fmt(total)}</div><div class="stat-sub">${names.length} projects</div></div>
     <div class="stat a fade"><div class="stat-label">Month to Date</div><div class="stat-val">${fmt(forecast.mtd)}</div><div class="stat-sub">${forecast.month}</div></div>
     <div class="stat g fade"><div class="stat-label">Forecast This Month</div><div class="stat-val">${forecast.forecast!==null?fmt(forecast.forecast):'N/A'}</div><div class="stat-sub">Cost Explorer estimate</div></div>
     <div class="stat p fade"><div class="stat-label">Top Project</div><div class="stat-val" style="font-size:16px;word-break:break-all">${top}</div><div class="stat-sub">${top!=='—'?fmt(projects[top].total):''}</div></div>`;
 }
 function renderProjects(projects){
   const names=Object.keys(projects);
-  if(!names.length){document.getElementById('projects-body').innerHTML='<div style="padding:36px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px">No tagged data yet — check Cost Allocation Tags in Billing console.</div>';return;}
+  if(!names.length){document.getElementById('projects-body').innerHTML='<div style="padding:36px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px">No tagged data yet.</div>';return;}
   const maxCost=projects[names[0]].total,grand=names.reduce((s,k)=>s+projects[k].total,0);
   document.getElementById('projects-body').innerHTML=names.map((name,i)=>{
     const p=projects[name],pct=maxCost>0?(p.total/maxCost*100).toFixed(1):0;
@@ -308,15 +308,87 @@ function renderTrendChart(data){
 }
 
 // ── AUDIOMOTH ──
-async function loadAudioMoth(){
-  document.getElementById('am-error').style.display='none';
-  try{
-    const[overview,units,monthly]=await Promise.all([get('/audiomoth/overview'),get('/audiomoth/units'),get('/audiomoth/monthly')]);
-    amLoaded=true;
-    renderAmStats(overview);renderHeatmap(overview.daily_series);
-    renderMonthlyTable(monthly.monthly);renderVolumeChart(overview.daily_series);renderUnitTable(units.units);
-  }catch(e){showErr('am-error',e.message+' — Ensure s3:ListBucket is in the IAM policy.');}
+function showScanning(scannedAt){
+  const since=scannedAt?` · last scan ${scannedAt.slice(0,16).replace('T',' ')} UTC`:'';
+  document.getElementById('am-content').innerHTML=`
+    <div class="scanning-state">
+      <div class="scanning-spinner"></div>
+      <div class="scanning-title">Scanning S3 bucket…</div>
+      <div class="scanning-sub">Building index of all AudioMoth units${since}.<br>This takes 2–5 minutes for ~140 units. The page will update automatically.</div>
+    </div>`;
+  // Poll every 10s
+  if(scanPollTimer) clearInterval(scanPollTimer);
+  scanPollTimer=setInterval(async()=>{
+    const{data}=await get('/audiomoth/status');
+    if(data.status==='ready'){clearInterval(scanPollTimer);scanPollTimer=null;amLoaded=false;loadAudioMoth();}
+  },10000);
 }
+
+async function loadAudioMoth(){
+  if(scanPollTimer){clearInterval(scanPollTimer);scanPollTimer=null;}
+  document.getElementById('am-error').style.display='none';
+  hideInfo('am-info');
+  try{
+    const{status,data}=await get('/audiomoth/overview');
+    if(status===202){showScanning(null);return;}
+    amLoaded=true;
+    // Restore full content if we were in scanning state
+    restoreAmContent();
+    renderAmStats(data);
+    const[u,m]=await Promise.all([get('/audiomoth/units'),get('/audiomoth/monthly')]);
+    renderHeatmap(data.daily_series);
+    renderMonthlyTable(m.data.monthly);
+    renderVolumeChart(data.daily_series);
+    renderUnitTable(u.data.units);
+    if(data.scanned_at) showInfo('am-info','✓ Data from scan at '+data.scanned_at.slice(0,16).replace('T',' ')+' UTC · click ↺ RESCAN to refresh');
+  }catch(e){showErr('am-error',e.message);}
+}
+
+function restoreAmContent(){
+  document.getElementById('am-content').innerHTML=`
+    <div class="am-stats" id="am-stats">
+      <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+      <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+    </div>
+    <div class="panel"><div class="panel-head"><span class="panel-title">Active Units Per Day</span></div>
+      <div class="panel-body"><div class="heatmap-wrap"><div id="heatmap" class="heatmap-grid"></div></div>
+        <div class="hm-legend"><span>0 units</span>
+          <div class="hm-swatch" style="background:#111820"></div><div class="hm-swatch" style="background:#0d3a2a"></div>
+          <div class="hm-swatch" style="background:#0d6644"></div><div class="hm-swatch" style="background:#1a9e6a"></div>
+          <div class="hm-swatch" style="background:#3dffa0"></div><span>max units</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><div class="panel-head"><span class="panel-title">Monthly Summary</span></div>
+        <div class="panel-body" style="padding:0">
+          <table class="mo-table"><thead><tr><th>Month</th><th>Units Active</th><th>Recordings</th><th>Data</th></tr></thead>
+          <tbody id="mo-tbody"></tbody></table>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-head"><span class="panel-title">Daily Upload Volume</span></div>
+        <div class="panel-body"><div class="chart-wrap"><canvas id="volume-chart"></canvas></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Unit Registry</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--muted)" id="unit-count-label"></span>
+          <button class="rescan-btn" onclick="triggerRescan()">↺ RESCAN</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="unit-table"><thead><tr><th>Unit</th><th>Status</th><th>First Deployed</th><th>Last Active</th><th>Active Days</th><th>Recordings</th><th>Data Volume</th></tr></thead>
+        <tbody id="unit-tbody"></tbody></table>
+      </div>
+    </div>`;
+}
+
+async function triggerRescan(){
+  await fetch(API+'/audiomoth/scan',{method:'POST'});
+  amLoaded=false; showScanning(null);
+}
+
 function renderAmStats(ov){
   document.getElementById('am-stats').innerHTML=`
     <div class="stat g fade"><div class="stat-label">Total Units Ever</div><div class="stat-val">${ov.total_units}</div><div class="stat-sub">unique AudioMoths</div></div>
@@ -373,8 +445,7 @@ function renderUnitTable(units){
       <td><span class="status-dot ${active?'active':'inactive'}"></span><span style="font-size:10px;color:${active?'var(--green)':'var(--muted)'}">${active?'Active':'Inactive'}</span></td>
       <td style="color:var(--muted)">${u.first_seen}</td>
       <td style="color:var(--muted)">${u.last_seen}</td>
-      <td>${u.active_days}d</td>
-      <td>${u.total_files.toLocaleString()}</td>
+      <td>${u.active_days}d</td><td>${u.total_files.toLocaleString()}</td>
       <td><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%"></div></div><span style="color:var(--text);white-space:nowrap">${fmtBytes(u.total_bytes)}</span></div></td>
     </tr>`;}).join('');
 }
