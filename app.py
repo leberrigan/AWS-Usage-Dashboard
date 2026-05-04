@@ -1,4 +1,4 @@
-import os
+import os, json, threading
 from datetime import date, timedelta, datetime
 from collections import defaultdict
 import boto3
@@ -11,13 +11,20 @@ CORS(app)
 TAG_KEY   = os.environ.get("PROJECT_TAG_KEY", "Project")
 AM_BUCKET = os.environ.get("AUDIOMOTH_BUCKET", "nighthawk-raw-audio")
 REGION    = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+CACHE_FILE= "/tmp/audiomoth_cache.json"
 
 def ce(): return boto3.client("ce", region_name="us-east-1")
 def s3(): return boto3.client("s3", region_name=REGION)
-def period_start(): return "2024-06-01"
+
+def period_start():
+    d=date.today(); m,y=d.month-12,d.year
+    if m<=0: m+=12; y-=1
+    return f"{y}-{m:02d}-01"
 def period_end(): return date.today().replace(day=1).strftime("%Y-%m-%d")
 def today_str(): return date.today().strftime("%Y-%m-%d")
 def thirty_days_ago(): return (date.today()-timedelta(days=30)).strftime("%Y-%m-%d")
+
+# ── Cost Explorer endpoints (unchanged) ──────────────────────────────────────
 
 @app.route("/api/summary")
 def summary():
@@ -77,61 +84,140 @@ def services():
             if cost>=0.01: svcs[svc]=svcs.get(svc,0.0)+cost
     return jsonify({"services":dict(sorted(svcs.items(),key=lambda x:x[1],reverse=True))})
 
-def list_all_objects(bucket,prefix=""):
-    client=s3(); paginator=client.get_paginator("list_objects_v2"); objects=[]
-    for page in paginator.paginate(Bucket=bucket,Prefix=prefix):
-        for obj in page.get("Contents",[]):
-            objects.append({"key":obj["Key"],"size":obj["Size"],"last_modified":obj["LastModified"].isoformat()})
-    return objects
+# ── AudioMoth cache ───────────────────────────────────────────────────────────
 
-def parse_objects(objects):
-    units=defaultdict(lambda:{"dates":set(),"monthly":defaultdict(lambda:{"count":0,"bytes":0}),"total_bytes":0,"total_files":0,"first_seen":None,"last_seen":None})
-    daily_active=defaultdict(set); daily_volume=defaultdict(int)
-    for obj in objects:
-        parts=obj["key"].split("/")
-        if len(parts)<5: continue
-        unit,year,month,day=parts[0],parts[1],parts[2],parts[3]
-        try:
-            date_str=f"{year}-{month.zfill(2)}-{day.zfill(2)}"; datetime.strptime(date_str,"%Y-%m-%d")
-        except ValueError: continue
-        month_key=f"{year}-{month.zfill(2)}"; size=obj["size"]
-        u=units[unit]
-        u["dates"].add(date_str); u["monthly"][month_key]["count"]+=1; u["monthly"][month_key]["bytes"]+=size
-        u["total_bytes"]+=size; u["total_files"]+=1
-        if u["first_seen"] is None or date_str<u["first_seen"]: u["first_seen"]=date_str
-        if u["last_seen"] is None or date_str>u["last_seen"]: u["last_seen"]=date_str
-        daily_active[date_str].add(unit); daily_volume[date_str]+=size
-    return units,daily_active,daily_volume
+_cache_lock = threading.Lock()
+_scan_running = False
+
+def load_cache():
+    try:
+        with open(CACHE_FILE) as f: return json.load(f)
+    except: return None
+
+def save_cache(data):
+    with open(CACHE_FILE,"w") as f: json.dump(data,f)
+
+def run_scan():
+    global _scan_running
+    with _cache_lock:
+        if _scan_running: return
+        _scan_running = True
+    try:
+        client=s3()
+        # List units
+        resp=client.list_objects_v2(Bucket=AM_BUCKET,Delimiter="/")
+        units=[p["Prefix"].rstrip("/") for p in resp.get("CommonPrefixes",[])]
+
+        daily_active=defaultdict(set); daily_volume=defaultdict(int)
+        unit_data=[]
+        cutoff=(date.today()-timedelta(days=7)).strftime("%Y-%m-%d")
+
+        for unit in units:
+            dates=set(); size_by_date={}
+            # Year level
+            yr=client.list_objects_v2(Bucket=AM_BUCKET,Prefix=f"{unit}/",Delimiter="/")
+            for yp in yr.get("CommonPrefixes",[]):
+                year=yp["Prefix"].rstrip("/").split("/")[-1]
+                # Month level
+                mr=client.list_objects_v2(Bucket=AM_BUCKET,Prefix=yp["Prefix"],Delimiter="/")
+                for mp in mr.get("CommonPrefixes",[]):
+                    month=mp["Prefix"].rstrip("/").split("/")[-1]
+                    # Day level
+                    dr=client.list_objects_v2(Bucket=AM_BUCKET,Prefix=mp["Prefix"],Delimiter="/")
+                    for dp in dr.get("CommonPrefixes",[]):
+                        day=dp["Prefix"].rstrip("/").split("/")[-1]
+                        try:
+                            ds=f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                            datetime.strptime(ds,"%Y-%m-%d")
+                            dates.add(ds)
+                            # Sample up to 1000 files for size
+                            fp=client.list_objects_v2(Bucket=AM_BUCKET,Prefix=dp["Prefix"],MaxKeys=1000)
+                            count=len(fp.get("Contents",[])); sz=sum(o["Size"] for o in fp.get("Contents",[]))
+                            size_by_date[ds]={"count":count,"bytes":sz}
+                        except ValueError: pass
+
+            if not dates: continue
+            monthly=defaultdict(lambda:{"count":0,"bytes":0})
+            tf=0; tb=0
+            for ds,info in size_by_date.items():
+                mk=ds[:7]; monthly[mk]["count"]+=info["count"]; monthly[mk]["bytes"]+=info["bytes"]
+                tf+=info["count"]; tb+=info["bytes"]
+            for ds in dates:
+                daily_active[ds].add(unit)
+                daily_volume[ds]+=size_by_date.get(ds,{}).get("bytes",0)
+            unit_data.append({"unit":unit,"first_seen":min(dates),"last_seen":max(dates),
+                "total_files":tf,"total_bytes":tb,"active_days":len(dates),
+                "monthly":dict(sorted({k:dict(v) for k,v in monthly.items()}.items()))})
+
+        unit_data.sort(key=lambda x:x["last_seen"] or "",reverse=True)
+
+        # Monthly aggregate
+        monthly_agg=defaultdict(lambda:{"units":set(),"files":0,"bytes":0})
+        for u in unit_data:
+            for mk,m in u["monthly"].items():
+                monthly_agg[mk]["units"].add(u["unit"])
+                monthly_agg[mk]["files"]+=m["count"]; monthly_agg[mk]["bytes"]+=m["bytes"]
+
+        all_dates=sorted(daily_active.keys())
+        currently_active=sum(1 for u in unit_data if u["last_seen"]>=cutoff)
+
+        cache={
+            "scanned_at": datetime.utcnow().isoformat(),
+            "overview":{
+                "total_units":len(unit_data),"currently_active":currently_active,
+                "total_bytes":sum(u["total_bytes"] for u in unit_data),
+                "total_files":sum(u["total_files"] for u in unit_data),
+                "daily_series":[{"date":d,"active_units":len(daily_active[d]),"volume_bytes":daily_volume[d]} for d in all_dates]
+            },
+            "units": unit_data,
+            "monthly":[{"month":k,"active_units":len(v["units"]),"total_files":v["files"],"total_bytes":v["bytes"]}
+                for k,v in sorted(monthly_agg.items())]
+        }
+        save_cache(cache)
+    finally:
+        global _scan_running
+        _scan_running = False
+
+def get_cache_or_trigger():
+    cache=load_cache()
+    if cache is None:
+        # Trigger background scan, return pending status
+        threading.Thread(target=run_scan,daemon=True).start()
+        return None
+    return cache
+
+# ── AudioMoth endpoints ───────────────────────────────────────────────────────
+
+@app.route("/api/audiomoth/status")
+def audiomoth_status():
+    cache=load_cache()
+    if cache: return jsonify({"status":"ready","scanned_at":cache.get("scanned_at")})
+    if _scan_running: return jsonify({"status":"scanning"})
+    return jsonify({"status":"not_started"})
+
+@app.route("/api/audiomoth/scan", methods=["POST"])
+def audiomoth_scan():
+    """Trigger a background rescan."""
+    threading.Thread(target=run_scan,daemon=True).start()
+    return jsonify({"status":"scan_started"})
 
 @app.route("/api/audiomoth/overview")
 def audiomoth_overview():
-    objects=list_all_objects(AM_BUCKET); units,daily_active,daily_volume=parse_objects(objects)
-    cutoff=(date.today()-timedelta(days=7)).strftime("%Y-%m-%d")
-    currently_active=len([u for u,d in units.items() if d["last_seen"] and d["last_seen"]>=cutoff])
-    all_dates=sorted(daily_active.keys())
-    daily_series=[{"date":d,"active_units":len(daily_active[d]),"volume_bytes":daily_volume[d]} for d in all_dates]
-    return jsonify({"total_units":len(units),"currently_active":currently_active,
-        "total_bytes":sum(u["total_bytes"] for u in units.values()),
-        "total_files":sum(u["total_files"] for u in units.values()),"daily_series":daily_series})
+    cache=get_cache_or_trigger()
+    if cache is None: return jsonify({"status":"scanning","message":"First scan in progress, check back in a few minutes."}),202
+    return jsonify(cache["overview"])
 
 @app.route("/api/audiomoth/units")
 def audiomoth_units():
-    objects=list_all_objects(AM_BUCKET); units,_,_=parse_objects(objects)
-    result=[{"unit":n,"first_seen":u["first_seen"],"last_seen":u["last_seen"],"total_files":u["total_files"],
-        "total_bytes":u["total_bytes"],"active_days":len(u["dates"]),"monthly":dict(sorted(u["monthly"].items()))}
-        for n,u in sorted(units.items())]
-    result.sort(key=lambda x:x["last_seen"] or "",reverse=True)
-    return jsonify({"units":result})
+    cache=get_cache_or_trigger()
+    if cache is None: return jsonify({"status":"scanning","message":"First scan in progress."}),202
+    return jsonify({"units":cache["units"]})
 
 @app.route("/api/audiomoth/monthly")
 def audiomoth_monthly():
-    objects=list_all_objects(AM_BUCKET); units,_,_=parse_objects(objects)
-    monthly=defaultdict(lambda:{"units":set(),"files":0,"bytes":0})
-    for unit_name,u in units.items():
-        for month_key,m in u["monthly"].items():
-            monthly[month_key]["units"].add(unit_name); monthly[month_key]["files"]+=m["count"]; monthly[month_key]["bytes"]+=m["bytes"]
-    result=[{"month":k,"active_units":len(v["units"]),"total_files":v["files"],"total_bytes":v["bytes"]} for k,v in sorted(monthly.items())]
-    return jsonify({"monthly":result})
+    cache=get_cache_or_trigger()
+    if cache is None: return jsonify({"status":"scanning","message":"First scan in progress."}),202
+    return jsonify({"monthly":cache["monthly"]})
 
 @app.route("/health")
 def health(): return jsonify({"status":"ok"})
