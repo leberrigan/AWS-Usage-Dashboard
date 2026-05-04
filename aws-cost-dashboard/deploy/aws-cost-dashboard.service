@@ -1,0 +1,18 @@
+[Unit]
+Description=AWS Cost Dashboard Backend
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/aws-cost-dashboard/backend
+ExecStart=/opt/aws-cost-dashboard/venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
+Restart=always
+RestartSec=5
+
+# AWS credentials — use IAM role (recommended) or set here
+# Environment=AWS_DEFAULT_REGION=us-east-1
+# Environment=PROJECT_TAG_KEY=Project
+
+[Install]
+WantedBy=multi-user.target

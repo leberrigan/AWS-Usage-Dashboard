@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS Cost Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0e14;
+    --bg2: #0f1520;
+    --bg3: #151d2e;
+    --border: #1e2d45;
+    --text: #c8d8f0;
+    --muted: #4a6080;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff7f;
+    --warn: #ffd166;
+    --danger: #ff4d6d;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .logo h1 {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #fff;
+  }
+  .logo span { color: var(--accent); }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .period-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 3px;
+  }
+  .refresh-btn {
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 14px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .refresh-btn:hover { background: var(--accent); color: var(--bg); }
+
+  /* ── Layout ── */
+  main {
+    padding: 28px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* ── Error / Loading ── */
+  #error-banner {
+    display: none;
+    background: #1a0a0a;
+    border: 1px solid var(--danger);
+    color: #ff8fa3;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 12px 18px;
+    border-radius: 4px;
+    margin-bottom: 24px;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--bg3) 25%, var(--bg2) 50%, var(--bg3) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 4px;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ── Stat Row ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 20px 22px;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+  .stat-card.warn::before { background: var(--warn); }
+  .stat-card.danger::before { background: var(--danger); }
+  .stat-card.green::before { background: var(--accent3); }
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1;
+  }
+  .stat-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    font-family: var(--mono);
+  }
+
+  /* ── Two-column grid ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  /* ── Panel ── */
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .panel-body { padding: 20px; }
+
+  /* ── Projects Table ── */
+  .projects-panel { margin-bottom: 28px; }
+
+  .project-row {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .project-row:last-child { border-bottom: none; }
+  .project-row:hover { background: var(--bg3); }
+
+  .project-summary {
+    display: grid;
+    grid-template-columns: 220px 1fr 130px 80px 30px;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+  }
+
+  .project-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cost-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .cost-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .cost-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .project-cost {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    text-align: right;
+  }
+  .project-share {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .expand-icon {
+    color: var(--muted);
+    font-size: 10px;
+    transition: transform 0.2s;
+    text-align: center;
+  }
+  .project-row.expanded .expand-icon { transform: rotate(180deg); }
+
+  /* ── Service breakdown (expanded) ── */
+  .service-breakdown {
+    display: none;
+    padding: 0 20px 16px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .project-row.expanded .service-breakdown { display: block; }
+
+  .service-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    padding-top: 14px;
+  }
+  .service-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .service-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .service-cost-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  /* ── Monthly trend chart area ── */
+  .monthly-bars {
+    display: flex;
+    gap: 8px;
+    padding: 16px 0 0 0;
+    align-items: flex-end;
+    height: 120px;
+  }
+  .month-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+  .month-bar {
+    width: 100%;
+    background: var(--accent);
+    border-radius: 2px 2px 0 0;
+    transition: height 0.6s cubic-bezier(0.4,0,0.2,1);
+    opacity: 0.8;
+    min-height: 2px;
+  }
+  .month-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+  .month-val {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text);
+  }
+
+  /* ── Top Services ── */
+  .service-list { display: flex; flex-direction: column; gap: 8px; }
+  .svc-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .svc-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+  }
+  .svc-bar-bg {
+    flex: 1;
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .svc-bar-fill {
+    height: 100%;
+    background: var(--accent2);
+    border-radius: 2px;
+  }
+  .svc-val {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    width: 70px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── Trend chart ── */
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* ── Tag hint ── */
+  .tag-hint {
+    background: #0d1a0d;
+    border: 1px solid #1a3a1a;
+    border-left: 3px solid var(--accent3);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #7fcf7f;
+    line-height: 1.7;
+  }
+  .tag-hint strong { color: var(--accent3); }
+  code {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 1px 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--warn);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .project-summary { grid-template-columns: 1fr 80px 26px; }
+    .cost-bar-wrap { display: none; }
+    .project-share { display: none; }
+  }
+
+  .fade-in { animation: fadeIn 0.4s ease both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    <h1>AWS<span>/</span>COSTS</h1>
+  </div>
+  <div class="header-meta">
+    <div class="period-badge" id="period-label">Loading…</div>
+    <button class="refresh-btn" onclick="loadAll()">↺ REFRESH</button>
+  </div>
+</header>
+
+<main>
+  <div id="error-banner"></div>
+
+  <div class="tag-hint">
+    <strong>Tip:</strong> Projects are grouped by the AWS tag <code id="tag-key-hint">Project</code>.
+    Tag your EC2, S3, RDS, and other resources with e.g. <code>Project = my-app</code> to see them grouped here.
+    Untagged costs appear under <code>(untagged)</code>.
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card skeleton" style="height:90px"></div>
+    <div class="stat-card skeleton" style="height:90px"></div>
+    <div class="stat-card skeleton" style="height:90px"></div>
+    <div class="stat-card skeleton" style="height:90px"></div>
+  </div>
+
+  <!-- Projects table -->
+  <div class="panel projects-panel">
+    <div class="panel-header">
+      <span class="panel-title">Projects</span>
+      <span class="panel-title" style="color:var(--muted);font-size:10px">Click row to expand services</span>
+    </div>
+    <div id="projects-container">
+      <div style="padding:40px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">
+        Loading project data…
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">30-Day Spend Trend</span>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap">
+          <canvas id="trend-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Top Services · Last 30 Days</span>
+      </div>
+      <div class="panel-body">
+        <div class="service-list" id="services-list">
+          <div class="skeleton" style="height:12px;margin-bottom:8px"></div>
+          <div class="skeleton" style="height:12px;margin-bottom:8px"></div>
+          <div class="skeleton" style="height:12px;margin-bottom:8px"></div>
+          <div class="skeleton" style="height:12px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const API = (window.API_BASE || '') + '/api';
+let trendChart = null;
+
+// ── Color palette per project ──
+const PALETTE = [
+  '#00d4ff','#ff6b35','#7fff7f','#ffd166','#c77dff',
+  '#ff4d6d','#06d6a0','#f4a261','#a8dadc','#e9c46a'
+];
+function projectColor(i) { return PALETTE[i % PALETTE.length]; }
+
+async function apiFetch(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.style.display = 'block';
+  el.textContent = '⚠ ' + msg;
+}
+
+function fmt(n) {
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ── Load all data ──
+async function loadAll() {
+  document.getElementById('error-banner').style.display = 'none';
+  try {
+    const [summary, forecast, services, trend] = await Promise.all([
+      apiFetch('/summary'),
+      apiFetch('/forecast'),
+      apiFetch('/services'),
+      apiFetch('/trend'),
+    ]);
+
+    document.getElementById('tag-key-hint').textContent = summary.tag_key;
+    document.getElementById('period-label').textContent =
+      summary.period.start + ' → ' + summary.period.end;
+
+    renderStats(summary, forecast);
+    renderProjects(summary.projects);
+    renderServices(services.services);
+    renderTrend(trend);
+  } catch (e) {
+    showError(e.message + ' — Check that the backend is running and IAM permissions are set.');
+  }
+}
+
+// ── Stats row ──
+function renderStats(summary, forecast) {
+  const projects = summary.projects;
+  const names = Object.keys(projects);
+  const total3mo = names.reduce((s, k) => s + projects[k].total, 0);
+  const topProject = names[0] || '—';
+  const topCost = names[0] ? projects[names[0]].total : 0;
+
+  const html = `
+    <div class="stat-card fade-in">
+      <div class="stat-label">3-Month Total</div>
+      <div class="stat-value">${fmt(total3mo)}</div>
+      <div class="stat-sub">${names.length} project${names.length !== 1 ? 's' : ''} tracked</div>
+    </div>
+    <div class="stat-card warn fade-in">
+      <div class="stat-label">Month to Date</div>
+      <div class="stat-value">${fmt(forecast.mtd)}</div>
+      <div class="stat-sub">${forecast.month}</div>
+    </div>
+    <div class="stat-card ${forecast.forecast && forecast.forecast > total3mo/3 * 1.2 ? 'danger' : 'green'} fade-in">
+      <div class="stat-label">Forecast (This Month)</div>
+      <div class="stat-value">${forecast.forecast !== null ? fmt(forecast.forecast) : 'N/A'}</div>
+      <div class="stat-sub">Cost Explorer estimate</div>
+    </div>
+    <div class="stat-card fade-in">
+      <div class="stat-label">Top Project</div>
+      <div class="stat-value" style="font-size:18px;word-break:break-all">${topProject}</div>
+      <div class="stat-sub">${fmt(topCost)} over period</div>
+    </div>
+  `;
+  document.getElementById('stats-row').innerHTML = html;
+}
+
+// ── Projects table ──
+function renderProjects(projects) {
+  const names = Object.keys(projects);
+  if (!names.length) {
+    document.getElementById('projects-container').innerHTML =
+      '<div style="padding:40px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No cost data found. Check IAM permissions and resource tags.</div>';
+    return;
+  }
+
+  const maxCost = projects[names[0]].total;
+  const grandTotal = names.reduce((s, k) => s + projects[k].total, 0);
+
+  const rows = names.map((name, i) => {
+    const p = projects[name];
+    const pct = maxCost > 0 ? (p.total / maxCost * 100).toFixed(1) : 0;
+    const share = grandTotal > 0 ? (p.total / grandTotal * 100).toFixed(1) : 0;
+    const color = projectColor(i);
+
+    // Monthly bars (up to 3 months)
+    const months = Object.keys(p.monthly).sort();
+    const maxM = Math.max(...Object.values(p.monthly), 0.01);
+    const monthBars = months.map(m => {
+      const h = Math.max(4, (p.monthly[m] / maxM * 80));
+      const label = m.slice(5); // MM
+      return `<div class="month-col">
+        <div class="month-val">${fmt(p.monthly[m]).replace('$','$')}</div>
+        <div class="month-bar" style="height:${h}px;background:${color}"></div>
+        <div class="month-label">${label}</div>
+      </div>`;
+    }).join('');
+
+    // Service chips
+    const svcItems = Object.entries(p.services).slice(0, 12).map(([svc, cost]) =>
+      `<div class="service-item">
+        <span class="service-name" title="${svc}">${svc}</span>
+        <span class="service-cost-val" style="color:${color}">${fmt(cost)}</span>
+      </div>`
+    ).join('');
+
+    return `
+      <div class="project-row" onclick="toggleRow(this)">
+        <div class="project-summary">
+          <div class="project-name" title="${name}">${name}</div>
+          <div class="cost-bar-wrap">
+            <div class="cost-bar-bg">
+              <div class="cost-bar-fill" style="width:${pct}%;background:${color}"></div>
+            </div>
+          </div>
+          <div class="project-cost">${fmt(p.total)}</div>
+          <div class="project-share">${share}%</div>
+          <div class="expand-icon">▼</div>
+        </div>
+        <div class="service-breakdown">
+          <div style="display:flex;gap:32px;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Monthly Breakdown</div>
+              <div class="monthly-bars">${monthBars}</div>
+            </div>
+          </div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin:16px 0 10px">Services</div>
+          <div class="service-grid">${svcItems}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('projects-container').innerHTML = rows;
+}
+
+function toggleRow(el) {
+  el.classList.toggle('expanded');
+}
+
+// ── Services bar list ──
+function renderServices(services) {
+  const entries = Object.entries(services).slice(0, 12);
+  if (!entries.length) {
+    document.getElementById('services-list').innerHTML =
+      '<div style="color:var(--muted);font-family:var(--mono);font-size:12px">No data</div>';
+    return;
+  }
+  const max = entries[0][1];
+  const html = entries.map(([svc, cost], i) => `
+    <div class="svc-row">
+      <div class="svc-label" title="${svc}">${svc}</div>
+      <div class="svc-bar-bg">
+        <div class="svc-bar-fill" style="width:${(cost/max*100).toFixed(1)}%;background:${PALETTE[i%PALETTE.length]}"></div>
+      </div>
+      <div class="svc-val">${fmt(cost)}</div>
+    </div>
+  `).join('');
+  document.getElementById('services-list').innerHTML = html;
+}
+
+// ── Trend chart ──
+function renderTrend(data) {
+  if (trendChart) { trendChart.destroy(); trendChart = null; }
+
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  const projectNames = Object.keys(data.series);
+  const dates = data.dates.map(d => d.slice(5)); // MM-DD
+
+  const datasets = projectNames.slice(0, 8).map((name, i) => {
+    const costMap = {};
+    (data.series[name] || []).forEach(pt => { costMap[pt.date] = pt.cost; });
+    return {
+      label: name,
+      data: data.dates.map(d => costMap[d] || 0),
+      borderColor: PALETTE[i % PALETTE.length],
+      backgroundColor: PALETTE[i % PALETTE.length] + '18',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      tension: 0.3,
+      fill: false,
+    };
+  });
+
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: {
+            color: '#4a6080',
+            font: { family: 'IBM Plex Mono', size: 10 },
+            boxWidth: 12,
+            padding: 12,
+          }
+        },
+        tooltip: {
+          backgroundColor: '#0f1520',
+          borderColor: '#1e2d45',
+          borderWidth: 1,
+          titleColor: '#c8d8f0',
+          bodyColor: '#7a9cc0',
+          titleFont: { family: 'IBM Plex Mono', size: 11 },
+          bodyFont: { family: 'IBM Plex Mono', size: 11 },
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#3a5070', font: { family: 'IBM Plex Mono', size: 9 }, maxTicksLimit: 10 },
+          grid: { color: '#1e2d45' },
+        },
+        y: {
+          ticks: {
+            color: '#3a5070',
+            font: { family: 'IBM Plex Mono', size: 9 },
+            callback: v => '$' + v.toFixed(2),
+          },
+          grid: { color: '#1e2d45' },
+        }
+      }
+    }
+  });
+}
+
+// ── Init ──
+loadAll();
+</script>
+</body>
+</html>

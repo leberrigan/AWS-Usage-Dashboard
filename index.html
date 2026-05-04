@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nighthawk · Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+:root {
+  --bg:#080c10;--bg2:#0c1118;--bg3:#111820;--bg4:#161f2a;--border:#1a2535;
+  --text:#b8cce0;--muted:#3d5470;--accent:#00d4ff;--green:#3dffa0;
+  --amber:#ffb830;--red:#ff4d6d;--purple:#b57aff;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:200;}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand svg{width:28px;height:28px;flex-shrink:0;}
+.brand-name{font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;letter-spacing:0.1em;}
+.brand-name em{color:var(--green);font-style:normal;}
+.header-right{display:flex;align-items:center;gap:14px;}
+.period-tag{font-family:var(--mono);font-size:10px;color:var(--muted);border:1px solid var(--border);padding:3px 10px;border-radius:2px;}
+.refresh-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:4px 12px;cursor:pointer;border-radius:2px;transition:all 0.2s;letter-spacing:0.06em;}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
+.tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 28px;}
+.tab-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:0.08em;padding:12px 20px;cursor:pointer;transition:all 0.2s;margin-bottom:-1px;text-transform:uppercase;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+main{padding:24px 28px;max-width:1440px;margin:0 auto;}
+.error-bar{display:none;background:#140608;border:1px solid var(--red);color:#ff8fa3;font-family:var(--mono);font-size:11px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
+.stats-row,.am-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.stat{background:var(--bg2);border:1px solid var(--border);padding:18px 20px;border-radius:3px;position:relative;overflow:hidden;}
+.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:var(--accent);opacity:0.5;}
+.stat.g::after{background:var(--green);}
+.stat.a::after{background:var(--amber);}
+.stat.p::after{background:var(--purple);}
+.stat-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;}
+.stat-val{font-family:var(--mono);font-size:26px;font-weight:600;color:#fff;line-height:1;}
+.stat-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px;}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-bottom:20px;}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.panel-title{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text);}
+.panel-body{padding:18px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px;}
+.proj-row{border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s;}
+.proj-row:last-child{border-bottom:none;}
+.proj-row:hover{background:var(--bg3);}
+.proj-summary{display:grid;grid-template-columns:200px 1fr 120px 70px 24px;align-items:center;gap:14px;padding:13px 18px;}
+.proj-name{font-family:var(--mono);font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar-wrap{display:flex;align-items:center;}
+.bar-bg{flex:1;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:2px;transition:width 0.6s cubic-bezier(.4,0,.2,1);}
+.proj-cost{font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;text-align:right;}
+.proj-share{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;}
+.chevron{color:var(--muted);font-size:9px;transition:transform 0.2s;}
+.proj-row.open .chevron{transform:rotate(180deg);}
+.proj-detail{display:none;padding:14px 18px 18px;background:var(--bg);border-top:1px solid var(--border);}
+.proj-row.open .proj-detail{display:block;}
+.monthly-bars{display:flex;gap:6px;align-items:flex-end;height:80px;margin-bottom:16px;}
+.mo-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end;}
+.mo-bar{width:100%;border-radius:2px 2px 0 0;min-height:2px;}
+.mo-label{font-family:var(--mono);font-size:8px;color:var(--muted);}
+.mo-val{font-family:var(--mono);font-size:9px;color:var(--text);}
+.svc-chips{display:flex;flex-wrap:wrap;gap:7px;}
+.svc-chip{background:var(--bg3);border:1px solid var(--border);border-radius:2px;padding:5px 10px;display:flex;gap:10px;align-items:center;}
+.svc-chip-name{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.svc-chip-cost{font-family:var(--mono);font-size:11px;font-weight:500;}
+.svc-bars{display:flex;flex-direction:column;gap:9px;}
+.svc-row{display:flex;align-items:center;gap:10px;}
+.svc-name{font-family:var(--mono);font-size:10px;color:var(--muted);width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.svc-bar-bg{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
+.svc-bar-fill{height:100%;border-radius:2px;}
+.svc-val{font-family:var(--mono);font-size:10px;color:var(--text);width:65px;text-align:right;flex-shrink:0;}
+.chart-wrap{position:relative;height:200px;}
+.heatmap-wrap{overflow-x:auto;padding-bottom:4px;}
+.heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,14px);gap:2px;width:max-content;padding:4px 0;}
+.hm-cell{width:14px;height:14px;border-radius:2px;background:var(--bg4);cursor:default;}
+.hm-cell:hover{outline:1px solid var(--accent);}
+.hm-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-family:var(--mono);font-size:9px;color:var(--muted);}
+.hm-swatch{width:10px;height:10px;border-radius:1px;}
+.unit-table,.mo-table{width:100%;border-collapse:collapse;}
+.unit-table th,.mo-table th{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.unit-table td,.mo-table td{font-family:var(--mono);font-size:11px;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.unit-table tr:last-child td,.mo-table tr:last-child td{border-bottom:none;}
+.unit-table tr:hover td,.mo-table tr:hover td{background:var(--bg3);}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.status-dot.active{background:var(--green);box-shadow:0 0 6px var(--green);}
+.status-dot.inactive{background:var(--muted);}
+.mini-bar-wrap{display:flex;align-items:center;gap:8px;}
+.mini-bar-bg{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;min-width:60px;}
+.mini-bar-fill{height:100%;border-radius:2px;background:var(--purple);}
+.skel{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg2) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.3s infinite;border-radius:3px;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.fade{animation:fadeUp 0.35s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(max-width:860px){
+  .stats-row,.am-stats{grid-template-columns:repeat(2,1fr);}
+  .grid2{grid-template-columns:1fr;}
+  .proj-summary{grid-template-columns:1fr 90px 22px;}
+  .bar-wrap,.proj-share{display:none;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="14" cy="14" r="13" stroke="#1a2535" stroke-width="1.5"/>
+      <path d="M7 19 Q14 6 21 19" stroke="#3dffa0" stroke-width="1.5" fill="none"/>
+      <circle cx="14" cy="14" r="2" fill="#3dffa0"/>
+    </svg>
+    <span class="brand-name">NIGHTHAWK <em>/</em> OPS</span>
+  </div>
+  <div class="header-right">
+    <div class="period-tag" id="period-label">Jun 2024 → present</div>
+    <button class="refresh-btn" onclick="reloadActive()">↺ REFRESH</button>
+  </div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('costs',this)"><span style="margin-right:7px">$</span>AWS COSTS</button>
+  <button class="tab-btn" onclick="switchTab('audiomoth',this)"><span style="margin-right:7px">◉</span>AUDIOMOTH UNITS</button>
+</div>
+
+<!-- COSTS TAB -->
+<div class="tab-pane active" id="tab-costs">
+<main>
+  <div class="error-bar" id="cost-error"></div>
+  <div class="stats-row" id="cost-stats">
+    <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+    <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Projects · Monthly Breakdown</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--muted)">Click to expand</span>
+    </div>
+    <div id="projects-body"><div style="padding:36px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px">Loading…</div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">30-Day Daily Trend</span></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="trend-chart"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Top Services · Last 30d</span></div>
+      <div class="panel-body"><div class="svc-bars" id="svc-bars">
+        <div class="skel" style="height:10px"></div><div class="skel" style="height:10px;margin-top:9px"></div><div class="skel" style="height:10px;margin-top:9px"></div>
+      </div></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- AUDIOMOTH TAB -->
+<div class="tab-pane" id="tab-audiomoth">
+<main>
+  <div class="error-bar" id="am-error"></div>
+  <div class="am-stats" id="am-stats">
+    <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+    <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Active Units Per Day</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--muted)">Each cell = 1 day · colour intensity = unit count · hover for details</span>
+    </div>
+    <div class="panel-body">
+      <div class="heatmap-wrap"><div id="heatmap" class="heatmap-grid"></div></div>
+      <div class="hm-legend">
+        <span>0 units</span>
+        <div class="hm-swatch" style="background:#111820"></div>
+        <div class="hm-swatch" style="background:#0d3a2a"></div>
+        <div class="hm-swatch" style="background:#0d6644"></div>
+        <div class="hm-swatch" style="background:#1a9e6a"></div>
+        <div class="hm-swatch" style="background:#3dffa0"></div>
+        <span>max units</span>
+      </div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Monthly Summary</span></div>
+      <div class="panel-body" style="padding:0">
+        <table class="mo-table">
+          <thead><tr><th>Month</th><th>Units Active</th><th>Recordings</th><th>Data</th></tr></thead>
+          <tbody id="mo-tbody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Daily Upload Volume</span></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="volume-chart"></canvas></div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Unit Registry</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--muted)" id="unit-count-label"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="unit-table">
+        <thead><tr><th>Unit</th><th>Status</th><th>First Deployed</th><th>Last Active</th><th>Active Days</th><th>Recordings</th><th>Data Volume</th></tr></thead>
+        <tbody id="unit-tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+const API=(window.API_BASE||'')+'/api';
+const PAL=['#00d4ff','#3dffa0','#ffb830','#ff4d6d','#b57aff','#ff6b35','#06d6a0','#f4a261','#a8dadc','#e9c46a'];
+let trendChart=null,volumeChart=null,amLoaded=false;
+
+function switchTab(name,btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='audiomoth'&&!amLoaded) loadAudioMoth();
+}
+function reloadActive(){
+  const t=document.querySelector('.tab-pane.active').id.replace('tab-','');
+  if(t==='costs') loadCosts(); else{amLoaded=false;loadAudioMoth();}
+}
+function fmt(n){return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtBytes(b){
+  if(b>=1e12) return (b/1e12).toFixed(2)+' TB';
+  if(b>=1e9)  return (b/1e9).toFixed(2)+' GB';
+  if(b>=1e6)  return (b/1e6).toFixed(1)+' MB';
+  return (b/1e3).toFixed(0)+' KB';
+}
+async function get(p){const r=await fetch(API+p);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
+function showErr(id,msg){const el=document.getElementById(id);el.style.display='block';el.textContent='⚠ '+msg;}
+
+// ── COSTS ──
+async function loadCosts(){
+  document.getElementById('cost-error').style.display='none';
+  try{
+    const[summary,forecast,services,trend]=await Promise.all([get('/summary'),get('/forecast'),get('/services'),get('/trend')]);
+    renderCostStats(summary,forecast);renderProjects(summary.projects);
+    renderSvcBars(services.services);renderTrendChart(trend);
+    document.getElementById('period-label').textContent=summary.period.start.slice(0,7)+' → '+summary.period.end.slice(0,7);
+  }catch(e){showErr('cost-error',e.message);}
+}
+function renderCostStats(summary,forecast){
+  const projects=summary.projects,names=Object.keys(projects);
+  const total=names.reduce((s,k)=>s+projects[k].total,0),top=names[0]||'—';
+  document.getElementById('cost-stats').innerHTML=`
+    <div class="stat fade"><div class="stat-label">Total · Jun 2024–Now</div><div class="stat-val">${fmt(total)}</div><div class="stat-sub">${names.length} projects</div></div>
+    <div class="stat a fade"><div class="stat-label">Month to Date</div><div class="stat-val">${fmt(forecast.mtd)}</div><div class="stat-sub">${forecast.month}</div></div>
+    <div class="stat g fade"><div class="stat-label">Forecast This Month</div><div class="stat-val">${forecast.forecast!==null?fmt(forecast.forecast):'N/A'}</div><div class="stat-sub">Cost Explorer estimate</div></div>
+    <div class="stat p fade"><div class="stat-label">Top Project</div><div class="stat-val" style="font-size:16px;word-break:break-all">${top}</div><div class="stat-sub">${top!=='—'?fmt(projects[top].total):''}</div></div>`;
+}
+function renderProjects(projects){
+  const names=Object.keys(projects);
+  if(!names.length){document.getElementById('projects-body').innerHTML='<div style="padding:36px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px">No tagged data yet — check Cost Allocation Tags in Billing console.</div>';return;}
+  const maxCost=projects[names[0]].total,grand=names.reduce((s,k)=>s+projects[k].total,0);
+  document.getElementById('projects-body').innerHTML=names.map((name,i)=>{
+    const p=projects[name],pct=maxCost>0?(p.total/maxCost*100).toFixed(1):0;
+    const share=grand>0?(p.total/grand*100).toFixed(1):0,color=PAL[i%PAL.length];
+    const months=Object.keys(p.monthly).sort(),maxM=Math.max(...Object.values(p.monthly),0.01);
+    const bars=months.map(m=>{const h=Math.max(3,p.monthly[m]/maxM*64);
+      return`<div class="mo-col"><div class="mo-val">${p.monthly[m]>=1?'$'+p.monthly[m].toFixed(0):'<$1'}</div><div class="mo-bar" style="height:${h}px;background:${color}"></div><div class="mo-label">${m.slice(5)}</div></div>`;}).join('');
+    const chips=Object.entries(p.services).slice(0,10).map(([s,c])=>
+      `<div class="svc-chip"><span class="svc-chip-name">${s}</span><span class="svc-chip-cost" style="color:${color}">${fmt(c)}</span></div>`).join('');
+    return`<div class="proj-row" onclick="this.classList.toggle('open')">
+      <div class="proj-summary">
+        <div class="proj-name" title="${name}">${name}</div>
+        <div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div></div>
+        <div class="proj-cost">${fmt(p.total)}</div><div class="proj-share">${share}%</div><div class="chevron">▼</div>
+      </div>
+      <div class="proj-detail">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Monthly</div>
+        <div class="monthly-bars">${bars}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin:14px 0 8px">Services</div>
+        <div class="svc-chips">${chips}</div>
+      </div></div>`;}).join('');
+}
+function renderSvcBars(services){
+  const entries=Object.entries(services).slice(0,12);if(!entries.length)return;
+  const max=entries[0][1];
+  document.getElementById('svc-bars').innerHTML=entries.map(([s,c],i)=>
+    `<div class="svc-row"><div class="svc-name" title="${s}">${s}</div>
+    <div class="svc-bar-bg"><div class="svc-bar-fill" style="width:${(c/max*100).toFixed(1)}%;background:${PAL[i%PAL.length]}"></div></div>
+    <div class="svc-val">${fmt(c)}</div></div>`).join('');
+}
+function renderTrendChart(data){
+  if(trendChart){trendChart.destroy();trendChart=null;}
+  const ctx=document.getElementById('trend-chart').getContext('2d');
+  const names=Object.keys(data.series),labels=data.dates.map(d=>d.slice(5));
+  const datasets=names.slice(0,8).map((name,i)=>{
+    const map={};(data.series[name]||[]).forEach(pt=>{map[pt.date]=pt.cost;});
+    return{label:name,data:data.dates.map(d=>map[d]||0),borderColor:PAL[i%PAL.length],borderWidth:1.5,pointRadius:0,tension:0.3,fill:false};});
+  trendChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#3d5470',font:{family:'IBM Plex Mono',size:9},boxWidth:10,padding:10}},
+      tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,titleColor:'#b8cce0',bodyColor:'#3d5470',
+        titleFont:{family:'IBM Plex Mono',size:10},bodyFont:{family:'IBM Plex Mono',size:10},
+        callbacks:{label:c=>` ${c.dataset.label}: $${c.parsed.y.toFixed(2)}`}}},
+    scales:{x:{ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},maxTicksLimit:10},grid:{color:'#111820'}},
+      y:{ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},callback:v=>'$'+v.toFixed(2)},grid:{color:'#111820'}}}}});
+}
+
+// ── AUDIOMOTH ──
+async function loadAudioMoth(){
+  document.getElementById('am-error').style.display='none';
+  try{
+    const[overview,units,monthly]=await Promise.all([get('/audiomoth/overview'),get('/audiomoth/units'),get('/audiomoth/monthly')]);
+    amLoaded=true;
+    renderAmStats(overview);renderHeatmap(overview.daily_series);
+    renderMonthlyTable(monthly.monthly);renderVolumeChart(overview.daily_series);renderUnitTable(units.units);
+  }catch(e){showErr('am-error',e.message+' — Ensure s3:ListBucket is in the IAM policy.');}
+}
+function renderAmStats(ov){
+  document.getElementById('am-stats').innerHTML=`
+    <div class="stat g fade"><div class="stat-label">Total Units Ever</div><div class="stat-val">${ov.total_units}</div><div class="stat-sub">unique AudioMoths</div></div>
+    <div class="stat fade"><div class="stat-label">Active (Last 7d)</div><div class="stat-val">${ov.currently_active}</div><div class="stat-sub">currently deployed</div></div>
+    <div class="stat p fade"><div class="stat-label">Total Recordings</div><div class="stat-val">${ov.total_files.toLocaleString()}</div><div class="stat-sub">FLAC files</div></div>
+    <div class="stat a fade"><div class="stat-label">Total Data</div><div class="stat-val" style="font-size:20px">${fmtBytes(ov.total_bytes)}</div><div class="stat-sub">in S3</div></div>`;
+}
+function hmColor(val,max){
+  if(val===0) return '#111820';const t=val/max;
+  if(t<0.2) return '#0d3a2a';if(t<0.4) return '#0d6644';if(t<0.7) return '#1a9e6a';return '#3dffa0';
+}
+function renderHeatmap(daily){
+  if(!daily.length) return;
+  const max=Math.max(...daily.map(d=>d.active_units),1);
+  const map={};daily.forEach(d=>{map[d.date]=d;});
+  const first=new Date(daily[0].date),last=new Date(daily[daily.length-1].date);
+  const start=new Date(first);start.setDate(start.getDate()-((start.getDay()+6)%7));
+  const cells=[];const cur=new Date(start);
+  while(cur<=last){
+    const ds=cur.toISOString().slice(0,10),d=map[ds];
+    const units=d?d.active_units:0,vol=d?fmtBytes(d.volume_bytes):'—';
+    cells.push(`<div class="hm-cell" style="background:${hmColor(units,max)}" title="${ds}: ${units} unit${units!==1?'s':''}, ${vol}"></div>`);
+    cur.setDate(cur.getDate()+1);
+  }
+  document.getElementById('heatmap').innerHTML=cells.join('');
+}
+function renderMonthlyTable(monthly){
+  if(!monthly.length) return;
+  document.getElementById('mo-tbody').innerHTML=monthly.slice().reverse().map(m=>
+    `<tr><td style="color:#fff">${m.month}</td><td style="color:var(--green)">${m.active_units}</td><td>${m.total_files.toLocaleString()}</td><td>${fmtBytes(m.total_bytes)}</td></tr>`).join('');
+}
+function renderVolumeChart(daily){
+  if(volumeChart){volumeChart.destroy();volumeChart=null;}
+  const ctx=document.getElementById('volume-chart').getContext('2d');
+  const labels=daily.map(d=>d.date.slice(5)),data=daily.map(d=>+(d.volume_bytes/1e9).toFixed(3));
+  volumeChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'GB uploaded',data,
+    backgroundColor:'#b57aff33',borderColor:'#b57aff',borderWidth:1,borderRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
+        titleColor:'#b8cce0',bodyColor:'#3d5470',titleFont:{family:'IBM Plex Mono',size:10},bodyFont:{family:'IBM Plex Mono',size:10},
+        callbacks:{label:c=>` ${c.parsed.y.toFixed(3)} GB`}}},
+      scales:{x:{ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},maxTicksLimit:12},grid:{display:false}},
+        y:{ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},callback:v=>v+'GB'},grid:{color:'#111820'}}}}});
+}
+function renderUnitTable(units){
+  document.getElementById('unit-count-label').textContent=units.length+' units total';
+  const maxB=Math.max(...units.map(u=>u.total_bytes),1);
+  const sevenAgo=new Date();sevenAgo.setDate(sevenAgo.getDate()-7);
+  const sevenStr=sevenAgo.toISOString().slice(0,10);
+  document.getElementById('unit-tbody').innerHTML=units.map(u=>{
+    const active=u.last_seen>=sevenStr,pct=(u.total_bytes/maxB*100).toFixed(1);
+    return`<tr>
+      <td style="color:#fff;font-weight:500">${u.unit}</td>
+      <td><span class="status-dot ${active?'active':'inactive'}"></span><span style="font-size:10px;color:${active?'var(--green)':'var(--muted)'}">${active?'Active':'Inactive'}</span></td>
+      <td style="color:var(--muted)">${u.first_seen}</td>
+      <td style="color:var(--muted)">${u.last_seen}</td>
+      <td>${u.active_days}d</td>
+      <td>${u.total_files.toLocaleString()}</td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%"></div></div><span style="color:var(--text);white-space:nowrap">${fmtBytes(u.total_bytes)}</span></div></td>
+    </tr>`;}).join('');
+}
+
+loadCosts();
+</script>
+</body>
+</html>
