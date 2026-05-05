@@ -75,7 +75,7 @@ After editing: `sudo systemctl daemon-reload && sudo systemctl restart aws-cost-
 sudo sed -i 's/Environment=PROJECT_TAG_KEY=Project/Environment=PROJECT_TAG_KEY=Project\nEnvironment=DASHBOARD_USER=admin\nEnvironment=DASHBOARD_PASS=lWRr31ovl0gyK/' /etc/systemd/system/aws-cost-dashboard.service
 ```
 
-## FTP Server
+## Updating
 
 Run this in the terminal after transferring files
 
@@ -85,18 +85,34 @@ sudo mv ~/app.py /opt/aws-cost-dashboard/backend/
 # Restart app
 sudo systemctl daemon-reload
 sudo systemctl restart aws-cost-dashboard
-# Get it to start scanning
-curl -X POST http://localhost:5000/api/audiomoth/scan
-# Test
-curl http://localhost:5000/api/audiomoth/status
 
 # Move index.html
 sudo mv ~/index.html /var/www/aws-cost-dashboard/
 ```
 
+Check the web interface, log in, click "Rescan".
+
+
 # See status
 ```
 sudo systemctl status aws-cost-dashboard
+```
+
+# Scan
+
+```
+# Get it to start scanning
+sudo curl -X POST http://localhost:5000/api/audiomoth/scan
+# Test
+curl http://localhost:5000/api/audiomoth/status
+
+```
+
+# API Endpoints
+
+```
+curl http://localhost:5000/api/audiomoth/locations
+curl http://localhost:5000/api/audiomoth/units
 ```
 
 

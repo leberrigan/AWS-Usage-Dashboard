@@ -5,26 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nighthawk · Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
-:root{--bg:#080c10;--bg2:#0c1118;--bg3:#111820;--bg4:#161f2a;--border:#1a2535;--text:#b8cce0;--muted:#3d5470;--accent:#00d4ff;--green:#3dffa0;--amber:#ffb830;--red:#ff4d6d;--purple:#b57aff;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;}
+:root{
+  --bg:#080c10;--bg2:#0c1118;--bg3:#111820;--bg4:#161f2a;--border:#1a2535;
+  --text:#c8ddf0;--muted:#6a8aa8;--accent:#00d4ff;--green:#3dffa0;
+  --amber:#ffb830;--red:#ff4d6d;--purple:#b57aff;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;min-height:100vh;}
 header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:200;}
 .brand{display:flex;align-items:center;gap:14px;}
 .brand svg{width:28px;height:28px;flex-shrink:0;}
-.brand-name{font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;letter-spacing:0.1em;}
+.brand-name{font-family:var(--mono);font-size:14px;font-weight:600;color:#fff;letter-spacing:0.1em;}
 .brand-name em{color:var(--green);font-style:normal;}
 .header-right{display:flex;align-items:center;gap:14px;}
-.period-tag{font-family:var(--mono);font-size:10px;color:var(--muted);border:1px solid var(--border);padding:3px 10px;border-radius:2px;}
-.refresh-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:4px 12px;cursor:pointer;border-radius:2px;transition:all 0.2s;letter-spacing:0.06em;}
+.period-tag{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);padding:3px 10px;border-radius:2px;}
+.refresh-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:4px 12px;cursor:pointer;border-radius:2px;transition:all 0.2s;letter-spacing:0.06em;}
 .refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
-.auth-badge{font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:2px;border:1px solid;}
+.auth-badge{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:2px;border:1px solid;}
 .auth-badge.in{color:var(--green);border-color:var(--green);}
 .auth-badge.out{color:var(--muted);border-color:var(--border);cursor:pointer;}
 .auth-badge.out:hover{border-color:var(--accent);color:var(--accent);}
 .tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 28px;}
-.tab-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:0.08em;padding:12px 20px;cursor:pointer;transition:all 0.2s;margin-bottom:-1px;text-transform:uppercase;}
+.tab-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:0.08em;padding:12px 20px;cursor:pointer;transition:all 0.2s;margin-bottom:-1px;text-transform:uppercase;}
 .tab-btn:hover{color:var(--text);}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
 .tab-btn.locked{opacity:0.35;cursor:default;}
@@ -35,64 +42,67 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .login-box{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:36px 40px;width:340px;}
 .login-title{font-family:var(--mono);font-size:14px;color:#fff;margin-bottom:24px;letter-spacing:.06em;}
 .login-field{margin-bottom:14px;}
-.login-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:6px;}
-.login-input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 12px;border-radius:2px;outline:none;}
+.login-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:6px;}
+.login-input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 12px;border-radius:2px;outline:none;}
 .login-input:focus{border-color:var(--accent);}
-.login-btn{width:100%;margin-top:8px;background:var(--accent);border:none;color:var(--bg);font-family:var(--mono);font-size:11px;font-weight:600;padding:10px;border-radius:2px;cursor:pointer;letter-spacing:.08em;transition:opacity .2s;}
+.login-btn{width:100%;margin-top:8px;background:var(--accent);border:none;color:var(--bg);font-family:var(--mono);font-size:12px;font-weight:600;padding:10px;border-radius:2px;cursor:pointer;letter-spacing:.08em;transition:opacity .2s;}
 .login-btn:hover{opacity:.85;}
-.login-err{font-family:var(--mono);font-size:10px;color:var(--red);margin-top:10px;display:none;}
-.login-skip{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;margin-top:14px;cursor:pointer;}
+.login-err{font-family:var(--mono);font-size:11px;color:var(--red);margin-top:10px;display:none;}
+.login-skip{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-top:14px;cursor:pointer;}
 .login-skip:hover{color:var(--text);}
 main{padding:24px 28px;max-width:1440px;margin:0 auto;}
-.error-bar{display:none;background:#140608;border:1px solid var(--red);color:#ff8fa3;font-family:var(--mono);font-size:11px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
-.info-bar{display:none;background:#0a1a10;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:11px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
+.error-bar{display:none;background:#140608;border:1px solid var(--red);color:#ff8fa3;font-family:var(--mono);font-size:12px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
+.info-bar{display:none;background:#0a1a10;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:12px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
 .stats-row,.am-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
 .stat{background:var(--bg2);border:1px solid var(--border);padding:18px 20px;border-radius:3px;position:relative;overflow:hidden;}
-.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;opacity:.5;}
+.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;opacity:.6;}
 .stat.c::after{background:var(--accent);}
 .stat.g::after{background:var(--green);}
 .stat.a::after{background:var(--amber);}
 .stat.p::after{background:var(--purple);}
-.stat-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;}
-.stat-val{font-family:var(--mono);font-size:26px;font-weight:600;color:#fff;line-height:1;}
-.stat-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px;}
+.stat-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;}
+.stat-val{font-family:var(--mono);font-size:28px;font-weight:600;color:#fff;line-height:1;}
+.stat-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px;}
 .panel{background:var(--bg2);border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-bottom:20px;}
-.panel-head{display:flex;align-items:center;justify-content:space-between;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--bg3);flex-wrap:wrap;gap:8px;}
-.panel-title{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text);}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--bg3);flex-wrap:wrap;gap:8px;}
+.panel-title{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text);}
 .panel-body{padding:18px;}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px;}
 .stacked-chart-wrap{position:relative;height:260px;}
 .range-btns{display:flex;gap:4px;}
-.range-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:9px;padding:3px 9px;cursor:pointer;border-radius:2px;letter-spacing:.06em;transition:all .15s;}
+.range-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:3px 10px;cursor:pointer;border-radius:2px;letter-spacing:.06em;transition:all .15s;}
 .range-btn:hover{border-color:var(--text);color:var(--text);}
 .range-btn.active{border-color:var(--accent);color:var(--accent);}
 .chart-wrap{position:relative;height:220px;}
-.svc-bars{display:flex;flex-direction:column;gap:9px;}
-.svc-row{display:flex;align-items:center;gap:10px;}
-.svc-name{font-family:var(--mono);font-size:10px;color:var(--muted);width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.svc-bar-bg{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
-.svc-bar-fill{height:100%;border-radius:2px;}
-.svc-val{font-family:var(--mono);font-size:10px;color:var(--text);width:65px;text-align:right;flex-shrink:0;}
+.svc-chart-wrap{position:relative;height:300px;}
 .hm-toggle{display:flex;gap:4px;}
-.hm-toggle-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:9px;padding:3px 9px;cursor:pointer;border-radius:2px;letter-spacing:.06em;transition:all .15s;}
+.hm-toggle-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:3px 10px;cursor:pointer;border-radius:2px;letter-spacing:.06em;transition:all .15s;}
 .hm-toggle-btn:hover{border-color:var(--text);color:var(--text);}
 .hm-toggle-btn.active{border-color:var(--green);color:var(--green);}
-.heatmap-wrap{overflow-x:auto;padding-bottom:4px;}
-.heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,14px);gap:2px;width:max-content;padding:4px 0;}
+/* GitHub-style heatmap */
+.hm-outer{overflow-x:auto;padding-bottom:4px;}
+.hm-container{display:flex;gap:6px;width:max-content;}
+.hm-y-labels{display:grid;grid-template-rows:repeat(7,14px);gap:2px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;padding-right:6px;margin-top:22px;line-height:14px;}
+.hm-right{display:flex;flex-direction:column;gap:4px;}
+.hm-x-labels{position:relative;height:20px;font-family:var(--mono);font-size:10px;color:var(--muted);}
+.hm-x-label{position:absolute;white-space:nowrap;}
+.heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,14px);gap:2px;width:max-content;}
 .hm-cell{width:14px;height:14px;border-radius:2px;background:var(--bg4);cursor:default;}
 .hm-cell:hover{outline:1px solid var(--accent);}
-.hm-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-family:var(--mono);font-size:9px;color:var(--muted);flex-wrap:wrap;}
-.hm-swatch{width:10px;height:10px;border-radius:1px;flex-shrink:0;}
+.hm-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--muted);flex-wrap:wrap;}
+.hm-swatch{width:11px;height:11px;border-radius:1px;flex-shrink:0;}
 .unit-table,.mo-table{width:100%;border-collapse:collapse;}
-.unit-table th,.mo-table th{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap;}
+.unit-table th,.mo-table th{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap;}
 .unit-table th.sortable{cursor:pointer;user-select:none;}
 .unit-table th.sortable:hover{color:var(--text);}
-.unit-table th.sort-asc::after{content:' ▲';font-size:8px;}
-.unit-table th.sort-desc::after{content:' ▼';font-size:8px;}
-.unit-table td,.mo-table td{font-family:var(--mono);font-size:11px;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.unit-table th.sort-asc::after{content:' ▲';font-size:9px;}
+.unit-table th.sort-desc::after{content:' ▼';font-size:9px;}
+.unit-table td,.mo-table td{font-family:var(--mono);font-size:12px;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
 .unit-table tr:last-child td,.mo-table tr:last-child td{border-bottom:none;}
-.unit-table tr:hover td,.mo-table tr:hover td{background:var(--bg3);}
-.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.unit-table tr:hover td{background:var(--bg3);cursor:pointer;}
+.unit-table tr.selected td{background:#111c14;cursor:pointer;}
+.mo-table tr:hover td{background:var(--bg3);}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle;}
 .status-dot.active{background:var(--green);box-shadow:0 0 6px var(--green);}
 .status-dot.inactive{background:var(--muted);}
 .mini-bar-wrap{display:flex;align-items:center;gap:8px;}
@@ -101,9 +111,9 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 .scanning-state{padding:48px;text-align:center;}
 .scanning-spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;}
 @keyframes spin{to{transform:rotate(360deg)}}
-.scanning-title{font-family:var(--mono);font-size:13px;color:var(--green);margin-bottom:8px;}
-.scanning-sub{font-family:var(--mono);font-size:10px;color:var(--muted);}
-.rescan-btn{background:none;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:10px;padding:6px 16px;cursor:pointer;border-radius:2px;transition:all 0.2s;}
+.scanning-title{font-family:var(--mono);font-size:14px;color:var(--green);margin-bottom:8px;}
+.scanning-sub{font-family:var(--mono);font-size:11px;color:var(--muted);}
+.rescan-btn{background:none;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:11px;padding:6px 16px;cursor:pointer;border-radius:2px;transition:all 0.2s;}
 .rescan-btn:hover{background:var(--green);color:var(--bg);}
 .rescan-btn.locked{border-color:var(--border);color:var(--muted);cursor:default;}
 .rescan-btn.locked:hover{background:none;color:var(--muted);}
@@ -111,6 +121,16 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .fade{animation:fadeUp 0.35s ease both;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+/* Leaflet map */
+#am-map{height:420px;border-radius:0;background:var(--bg3);}
+.leaflet-container{background:#0a1018;}
+/* Unit detail panel */
+.unit-detail-panel{display:none;border-top:1px solid var(--border);padding:18px;}
+.unit-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.unit-detail-title{font-family:var(--mono);font-size:13px;color:#fff;}
+.unit-detail-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;}
+.unit-detail-close:hover{color:var(--text);}
+.detail-chart-wrap{position:relative;height:180px;}
 @media(max-width:860px){.stats-row,.am-stats{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}}
 </style>
 </head>
@@ -160,13 +180,13 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 <main>
   <div class="error-bar" id="cost-error"></div>
   <div class="stats-row" id="cost-stats">
-    <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
-    <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+    <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
+    <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
   </div>
   <div class="panel">
     <div class="panel-head">
       <span class="panel-title">Projects · Stacked Monthly Cost</span>
-      <span style="font-family:var(--mono);font-size:9px;color:var(--muted)">Each colour = one project</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">Each colour = one project</span>
     </div>
     <div class="panel-body"><div class="stacked-chart-wrap"><canvas id="stacked-chart"></canvas></div></div>
   </div>
@@ -186,10 +206,12 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     </div>
     <div class="panel">
       <div class="panel-head"><span class="panel-title">Top Services · Last 30d</span></div>
-      <div class="panel-body"><div class="svc-bars" id="svc-bars">
-        <div class="skel" style="height:10px"></div><div class="skel" style="height:10px;margin-top:9px"></div><div class="skel" style="height:10px;margin-top:9px"></div>
-      </div></div>
+      <div class="panel-body"><div class="svc-chart-wrap"><canvas id="svc-chart"></canvas></div></div>
     </div>
+  </div>
+  <div class="panel" id="cost-per-station-panel" style="display:none">
+    <div class="panel-head"><span class="panel-title">Monthly Cost per Active Station</span></div>
+    <div class="panel-body"><div class="chart-wrap"><canvas id="cps-chart"></canvas></div></div>
   </div>
 </main>
 </div>
@@ -201,8 +223,8 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
   <div class="info-bar" id="am-info"></div>
   <div id="am-content">
     <div class="am-stats" id="am-stats">
-      <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
-      <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+      <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
+      <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
     </div>
     <div class="panel">
       <div class="panel-head">
@@ -213,8 +235,29 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
         </div>
       </div>
       <div class="panel-body">
-        <div class="heatmap-wrap"><div id="heatmap" class="heatmap-grid"></div></div>
+        <div class="hm-outer">
+          <div class="hm-container">
+            <div class="hm-y-labels" id="hm-y-labels"></div>
+            <div class="hm-right">
+              <div class="hm-x-labels" id="hm-x-labels"></div>
+              <div id="heatmap" class="heatmap-grid"></div>
+            </div>
+          </div>
+        </div>
         <div class="hm-legend" id="hm-legend"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Station Locations</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="map-status-label"></span>
+      </div>
+      <div id="am-map"></div>
+      <div class="unit-detail-panel" id="unit-detail-panel">
+        <div class="unit-detail-header">
+          <span class="unit-detail-title" id="unit-detail-title">—</span>
+          <button class="unit-detail-close" onclick="closeUnitDetail()">✕</button>
+        </div>
+        <div class="detail-chart-wrap"><canvas id="detail-chart"></canvas></div>
       </div>
     </div>
     <div class="grid2">
@@ -232,7 +275,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
       <div class="panel-head">
         <span class="panel-title">Unit Registry</span>
         <div style="display:flex;align-items:center;gap:12px">
-          <span style="font-family:var(--mono);font-size:9px;color:var(--muted)" id="unit-count-label"></span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="unit-count-label"></span>
           <button class="rescan-btn locked" id="rescan-btn" onclick="tryRescan()">↺ RESCAN</button>
         </div>
       </div>
@@ -260,29 +303,28 @@ const API=(window.API_BASE||'')+'/api';
 const PAL=['#00d4ff','#3dffa0','#ffb830','#ff4d6d','#b57aff','#ff6b35','#06d6a0','#f4a261','#a8dadc','#e9c46a'];
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-let trendChart=null,volumeChart=null,stackedChart=null;
+let trendChart=null,volumeChart=null,stackedChart=null,svcChart=null,cpsChart=null,detailChart=null;
 let amLoaded=false,costsLoaded=false,scanPollTimer=null;
-let _summaryData=null,_trendData=null,_amOverview=null;
+let _summaryData=null,_trendData=null,_amOverview=null,_monthlyData=null;
 let _unitData=[],_sortCol='last_seen',_sortDir='desc';
 let _hmMode='units',_dailySeries=[];
 let _trendRange='30d';
 let _authed=false,_authCreds=null;
+let _map=null,_markers={},_selectedUnit=null,_locData=[];
 
 // ── Date formatting ──────────────────────────────────────────────────────────
 function fmtMonth(ym){
-  // "2025-09" -> "Sep-2025"
   const[y,m]=ym.split('-');
   return MONTHS[parseInt(m,10)-1]+'-'+y;
 }
 function fmtDate(ymd){
-  // "2025-09-01" -> "01-Sep-2025"
   const[y,m,d]=ymd.split('-');
   return d+'-'+MONTHS[parseInt(m,10)-1]+'-'+y;
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
-function showLogin(){ document.getElementById('login-overlay').style.display='flex'; document.getElementById('login-user').focus(); }
-function closeLogin(){ document.getElementById('login-overlay').style.display='none'; }
+function showLogin(){document.getElementById('login-overlay').style.display='flex';document.getElementById('login-user').focus();}
+function closeLogin(){document.getElementById('login-overlay').style.display='none';}
 
 async function doLogin(){
   const user=document.getElementById('login-user').value;
@@ -291,8 +333,7 @@ async function doLogin(){
   const r=await fetch(API+'/auth/check',{headers:{'Authorization':'Basic '+creds}});
   if(r.ok){
     _authed=true; _authCreds=creds;
-    closeLogin();
-    updateAuthUI();
+    closeLogin(); updateAuthUI();
     if(!costsLoaded) loadCosts();
   } else {
     document.getElementById('login-err').style.display='block';
@@ -304,28 +345,22 @@ function updateAuthUI(){
   const costsBtn=document.getElementById('tab-btn-costs');
   const rescanBtn=document.getElementById('rescan-btn');
   if(_authed){
-    badge.textContent='SIGNED IN'; badge.className='auth-badge in';
-    badge.onclick=null;
+    badge.textContent='SIGNED IN'; badge.className='auth-badge in'; badge.onclick=null;
     costsBtn.classList.remove('locked');
-    if(rescanBtn){ rescanBtn.classList.remove('locked'); }
+    if(rescanBtn) rescanBtn.classList.remove('locked');
   } else {
-    badge.textContent='SIGN IN'; badge.className='auth-badge out';
-    badge.onclick=showLogin;
+    badge.textContent='SIGN IN'; badge.className='auth-badge out'; badge.onclick=showLogin;
     costsBtn.classList.add('locked');
-    if(rescanBtn){ rescanBtn.classList.add('locked'); }
+    if(rescanBtn) rescanBtn.classList.add('locked');
   }
 }
 
 function clickCostsTab(btn){
-  if(!_authed){ showLogin(); return; }
+  if(!_authed){showLogin();return;}
   switchTab('costs',btn);
   if(!costsLoaded) loadCosts();
 }
-
-function tryRescan(){
-  if(!_authed){ showLogin(); return; }
-  triggerRescan();
-}
+function tryRescan(){if(!_authed){showLogin();return;} triggerRescan();}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function switchTab(name,btn){
@@ -334,11 +369,12 @@ function switchTab(name,btn){
   document.getElementById('tab-'+name).classList.add('active');
   btn.classList.add('active');
   if(name==='audiomoth'&&!amLoaded) loadAudioMoth();
+  if(name==='audiomoth'&&_map) setTimeout(()=>_map.invalidateSize(),100);
 }
 function reloadActive(){
   const t=document.querySelector('.tab-pane.active').id.replace('tab-','');
   if(t==='costs'&&_authed) loadCosts();
-  else if(t==='audiomoth'){ amLoaded=false; loadAudioMoth(); }
+  else if(t==='audiomoth'){amLoaded=false; loadAudioMoth();}
 }
 function fmt(n){return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtBytes(b){
@@ -357,6 +393,13 @@ function showErr(id,msg){const el=document.getElementById(id);el.style.display='
 function showInfo(id,msg){const el=document.getElementById(id);el.style.display='block';el.textContent=msg;}
 function hideInfo(id){document.getElementById(id).style.display='none';}
 
+const CHART_DEFAULTS={
+  titleColor:'#c8ddf0',bodyColor:'#6a8aa8',
+  titleFont:{family:'IBM Plex Mono',size:11},bodyFont:{family:'IBM Plex Mono',size:11},
+  tickColor:'#4a6a8a',tickFont:{family:'IBM Plex Mono',size:10},gridColor:'#111820',
+  legendColor:'#6a8aa8',legendFont:{family:'IBM Plex Mono',size:10}
+};
+
 // ════════════════════════════════════════════
 // COSTS TAB
 // ════════════════════════════════════════════
@@ -370,8 +413,9 @@ async function loadCosts(){
     costsLoaded=true;
     renderCostStats(s.data,f.data);
     renderStackedChart(s.data.projects);
-    renderSvcBars(sv.data.services);
+    renderSvcChart(sv.data.services);
     renderTrendChart();
+    renderCostPerStation();
     document.getElementById('period-label').textContent=
       fmtMonth(s.data.period.start.slice(0,7))+' → '+fmtMonth(s.data.period.end.slice(0,7));
   }catch(e){showErr('cost-error',e.message);}
@@ -384,7 +428,7 @@ function renderCostStats(summary,forecast){
     <div class="stat c fade"><div class="stat-label">Total · Period</div><div class="stat-val">${fmt(total)}</div><div class="stat-sub">${names.length} projects</div></div>
     <div class="stat a fade"><div class="stat-label">Month to Date</div><div class="stat-val">${fmt(forecast.mtd)}</div><div class="stat-sub">${forecast.month}</div></div>
     <div class="stat g fade"><div class="stat-label">Forecast This Month</div><div class="stat-val">${forecast.forecast!==null?fmt(forecast.forecast):'N/A'}</div><div class="stat-sub">Cost Explorer estimate</div></div>
-    <div class="stat p fade"><div class="stat-label">Top Project</div><div class="stat-val" style="font-size:16px;word-break:break-all">${top}</div><div class="stat-sub">${top!=='—'?fmt(projects[top].total):''}</div></div>`;
+    <div class="stat p fade"><div class="stat-label">Top Project</div><div class="stat-val" style="font-size:18px;word-break:break-all">${top}</div><div class="stat-sub">${top!=='—'?fmt(projects[top].total):''}</div></div>`;
 }
 
 function renderStackedChart(projects){
@@ -397,24 +441,23 @@ function renderStackedChart(projects){
   const datasets=names.map((name,i)=>({
     label:name,
     data:months.map(m=>projects[name].monthly[m]||0),
-    backgroundColor:PAL[i%PAL.length]+'cc',
-    borderColor:PAL[i%PAL.length],
-    borderWidth:1,stack:'costs'
+    backgroundColor:PAL[i%PAL.length]+'cc',borderColor:PAL[i%PAL.length],borderWidth:1,stack:'costs'
   }));
   const ctx=document.getElementById('stacked-chart').getContext('2d');
   stackedChart=new Chart(ctx,{type:'bar',data:{labels:months.map(fmtMonth),datasets},
     options:{responsive:true,maintainAspectRatio:false,
       interaction:{mode:'index',intersect:false},
       plugins:{
-        legend:{labels:{color:'#3d5470',font:{family:'IBM Plex Mono',size:9},boxWidth:10,padding:10}},
-        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,titleColor:'#b8cce0',bodyColor:'#3d5470',
-          titleFont:{family:'IBM Plex Mono',size:10},bodyFont:{family:'IBM Plex Mono',size:10},
+        legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
+        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
+          titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
+          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
           callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y)}`,
             footer:items=>'  Total: '+fmt(items.reduce((s,i)=>s+i.parsed.y,0))}}
       },
       scales:{
-        x:{stacked:true,ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8}},grid:{color:'#111820'}},
-        y:{stacked:true,ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},callback:v=>'$'+v.toFixed(0)},grid:{color:'#111820'}}
+        x:{stacked:true,ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{color:CHART_DEFAULTS.gridColor}},
+        y:{stacked:true,ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(0)},grid:{color:CHART_DEFAULTS.gridColor}}
       }
     }
   });
@@ -424,7 +467,6 @@ async function setRange(range,btn){
   _trendRange=range;
   document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  // Fetch fresh data for this range from backend
   try{
     const tr=await get('/trend?range='+range,true);
     _trendData=tr.data;
@@ -440,13 +482,11 @@ function renderTrendChart(){
   const gran=_trendData.granularity||'DAILY';
   const labels=dates.map(d=>gran==='MONTHLY'?fmtMonth(d.slice(0,7)):fmtDate(d));
   const names=Object.keys(_trendData.series);
-
   const datasets=names.slice(0,8).map((name,i)=>{
     const map={};(_trendData.series[name]||[]).forEach(pt=>{map[pt.date]=pt.cost;});
     return{label:name,data:dates.map(d=>map[d]||0),
       borderColor:PAL[i%PAL.length],borderWidth:1.5,pointRadius:0,tension:0.3,fill:false,yAxisID:'y'};
   });
-
   if(_amOverview&&_amOverview.daily_series&&_amOverview.daily_series.length){
     const amMap={};
     _amOverview.daily_series.forEach(d=>{amMap[d.date]=d.active_units;});
@@ -454,7 +494,6 @@ function renderTrendChart(){
       label:'AudioMoth units',
       data:dates.map(d=>{
         if(gran==='MONTHLY'){
-          // Average units for the month
           const mk=d.slice(0,7);
           const matching=_amOverview.daily_series.filter(s=>s.date.startsWith(mk));
           if(!matching.length) return 0;
@@ -462,37 +501,111 @@ function renderTrendChart(){
         }
         return amMap[d]||0;
       }),
-      borderColor:'#ffffff88',borderWidth:1.5,
-      borderDash:[4,3],pointRadius:0,tension:0.3,fill:false,yAxisID:'y2'
+      borderColor:'#ffffff88',borderWidth:1.5,borderDash:[4,3],
+      pointRadius:0,tension:0.3,fill:false,yAxisID:'y2'
     });
   }
-
   const ctx=document.getElementById('trend-chart').getContext('2d');
   const hasAm=datasets.some(d=>d.yAxisID==='y2');
   trendChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
     responsive:true,maintainAspectRatio:false,
     interaction:{mode:'index',intersect:false},
     plugins:{
-      legend:{labels:{color:'#3d5470',font:{family:'IBM Plex Mono',size:9},boxWidth:10,padding:10}},
-      tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,titleColor:'#b8cce0',bodyColor:'#3d5470',
-        titleFont:{family:'IBM Plex Mono',size:10},bodyFont:{family:'IBM Plex Mono',size:10},
+      legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
+      tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
+        titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
+        titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
         callbacks:{label:c=>c.dataset.yAxisID==='y2'?` ${c.dataset.label}: ${c.parsed.y} units`:` ${c.dataset.label}: $${c.parsed.y.toFixed(2)}`}}
     },
     scales:{
-      x:{ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},maxTicksLimit:12},grid:{color:'#111820'}},
-      y:{position:'left',ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},callback:v=>'$'+v.toFixed(2)},grid:{color:'#111820'}},
-      y2:{display:hasAm,position:'right',ticks:{color:'#6a8090',font:{family:'IBM Plex Mono',size:8},callback:v=>v+' u'},grid:{drawOnChartArea:false}}
+      x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:12},grid:{color:CHART_DEFAULTS.gridColor}},
+      y:{position:'left',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(2)},grid:{color:CHART_DEFAULTS.gridColor}},
+      y2:{display:hasAm,position:'right',ticks:{color:'#7a9ab0',font:CHART_DEFAULTS.tickFont,callback:v=>v+' u'},grid:{drawOnChartArea:false}}
     }
   }});
 }
 
-function renderSvcBars(services){
-  const entries=Object.entries(services).slice(0,12);if(!entries.length)return;
-  const max=entries[0][1];
-  document.getElementById('svc-bars').innerHTML=entries.map(([s,c],i)=>
-    `<div class="svc-row"><div class="svc-name" title="${s}">${s}</div>
-    <div class="svc-bar-bg"><div class="svc-bar-fill" style="width:${(c/max*100).toFixed(1)}%;background:${PAL[i%PAL.length]}"></div></div>
-    <div class="svc-val">${fmt(c)}</div></div>`).join('');
+function renderSvcChart(services){
+  if(svcChart){svcChart.destroy();svcChart=null;}
+  const entries=Object.entries(services).slice(0,12);
+  if(!entries.length) return;
+  // Shorten long service names
+  const labels=entries.map(([s])=>s.replace('Amazon ','').replace('AWS ','').replace(' (AWS)',''));
+  const data=entries.map(([,c])=>c);
+  const ctx=document.getElementById('svc-chart').getContext('2d');
+  svcChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        data,
+        backgroundColor:entries.map((_,i)=>PAL[i%PAL.length]+'bb'),
+        borderColor:entries.map((_,i)=>PAL[i%PAL.length]),
+        borderWidth:1,borderRadius:2
+      }]
+    },
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
+          titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
+          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+          callbacks:{
+            title:items=>entries[items[0].dataIndex][0],
+            label:c=>` ${fmt(c.parsed.x)}`
+          }}
+      },
+      scales:{
+        x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(0)},grid:{color:CHART_DEFAULTS.gridColor}},
+        y:{ticks:{color:CHART_DEFAULTS.tickColor,font:{family:'IBM Plex Mono',size:10}},grid:{display:false}}
+      }
+    }
+  });
+}
+
+function renderCostPerStation(){
+  const panel=document.getElementById('cost-per-station-panel');
+  if(!_summaryData||!_monthlyData||!_monthlyData.length){panel.style.display='none';return;}
+  // Build monthly cost totals across all projects
+  const monthlyCost={};
+  Object.values(_summaryData.projects).forEach(p=>{
+    Object.entries(p.monthly).forEach(([mk,c])=>{
+      monthlyCost[mk]=(monthlyCost[mk]||0)+c;
+    });
+  });
+  // Match with AudioMoth monthly active unit counts
+  const points=[];
+  _monthlyData.forEach(m=>{
+    if(monthlyCost[m.month]&&m.active_units>0){
+      points.push({month:m.month,cps:monthlyCost[m.month]/m.active_units,units:m.active_units});
+    }
+  });
+  if(!points.length){panel.style.display='none';return;}
+  panel.style.display='block';
+  const avgMonthly=points.reduce((s,p)=>s+p.cps,0)/points.length;
+  // Prepend stat to panel-head
+  const head=panel.querySelector('.panel-head');
+  head.innerHTML=`<span class="panel-title">Monthly Cost per Active Station</span>
+    <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">avg <strong style="color:#fff">${fmt(avgMonthly)}</strong>/station/mo · <strong style="color:#fff">${fmt(avgMonthly*12)}</strong>/station/yr</span>`;
+  if(cpsChart){cpsChart.destroy();cpsChart=null;}
+  const ctx=document.getElementById('cps-chart').getContext('2d');
+  cpsChart=new Chart(ctx,{type:'bar',data:{
+    labels:points.map(p=>fmtMonth(p.month)),
+    datasets:[{label:'Cost per station',data:points.map(p=>+p.cps.toFixed(2)),
+      backgroundColor:'#00d4ff44',borderColor:'#00d4ff',borderWidth:1,borderRadius:2}]
+  },options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},
+      tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
+        titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
+        titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+        callbacks:{label:c=>` ${fmt(c.parsed.y)} / station (${points[c.dataIndex].units} active)`}}},
+    scales:{
+      x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{color:CHART_DEFAULTS.gridColor}},
+      y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(2)},grid:{color:CHART_DEFAULTS.gridColor}}
+    }
+  }});
 }
 
 // ════════════════════════════════════════════
@@ -522,13 +635,21 @@ async function loadAudioMoth(){
     amLoaded=true; _amOverview=data; _dailySeries=data.daily_series||[];
     restoreAmContent();
     renderAmStats(data);
-    const[u,m]=await Promise.all([get('/audiomoth/units'),get('/audiomoth/monthly')]);
+    const[u,m,loc]=await Promise.all([
+      get('/audiomoth/units'),
+      get('/audiomoth/monthly'),
+      get('/audiomoth/locations')
+    ]);
     _unitData=u.data.units||[];
+    _monthlyData=m.data.monthly||[];
+    _locData=loc.status===200?loc.data.locations||[]:[];
     renderHeatmap();
-    renderMonthlyTable(m.data.monthly);
+    renderMonthlyTable(_monthlyData);
     renderVolumeChart(_dailySeries);
     renderUnitTable();
-    renderTrendChart(); // refresh to add AM overlay if costs loaded
+    initMap();
+    renderTrendChart();
+    renderCostPerStation();
     if(data.scanned_at) showInfo('am-info',
       '✓ Data from scan at '+fmtDate(data.scanned_at.slice(0,10))+' '+data.scanned_at.slice(11,16)+' UTC · click ↺ RESCAN to refresh');
   }catch(e){showErr('am-error',e.message);}
@@ -537,8 +658,8 @@ async function loadAudioMoth(){
 function restoreAmContent(){
   document.getElementById('am-content').innerHTML=`
     <div class="am-stats" id="am-stats">
-      <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
-      <div class="stat skel" style="height:80px"></div><div class="stat skel" style="height:80px"></div>
+      <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
+      <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
     </div>
     <div class="panel">
       <div class="panel-head">
@@ -549,8 +670,29 @@ function restoreAmContent(){
         </div>
       </div>
       <div class="panel-body">
-        <div class="heatmap-wrap"><div id="heatmap" class="heatmap-grid"></div></div>
+        <div class="hm-outer">
+          <div class="hm-container">
+            <div class="hm-y-labels" id="hm-y-labels"></div>
+            <div class="hm-right">
+              <div class="hm-x-labels" id="hm-x-labels"></div>
+              <div id="heatmap" class="heatmap-grid"></div>
+            </div>
+          </div>
+        </div>
         <div class="hm-legend" id="hm-legend"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Station Locations</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="map-status-label"></span>
+      </div>
+      <div id="am-map"></div>
+      <div class="unit-detail-panel" id="unit-detail-panel">
+        <div class="unit-detail-header">
+          <span class="unit-detail-title" id="unit-detail-title">—</span>
+          <button class="unit-detail-close" onclick="closeUnitDetail()">✕</button>
+        </div>
+        <div class="detail-chart-wrap"><canvas id="detail-chart"></canvas></div>
       </div>
     </div>
     <div class="grid2">
@@ -568,7 +710,7 @@ function restoreAmContent(){
       <div class="panel-head">
         <span class="panel-title">Unit Registry</span>
         <div style="display:flex;align-items:center;gap:12px">
-          <span style="font-family:var(--mono);font-size:9px;color:var(--muted)" id="unit-count-label"></span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="unit-count-label"></span>
           <button class="rescan-btn ${_authed?'':'locked'}" id="rescan-btn" onclick="tryRescan()">↺ RESCAN</button>
         </div>
       </div>
@@ -587,6 +729,7 @@ function restoreAmContent(){
         </table>
       </div>
     </div>`;
+  _map=null; // reset map reference so initMap re-creates it
 }
 
 async function triggerRescan(){
@@ -599,7 +742,7 @@ function renderAmStats(ov){
     <div class="stat g fade"><div class="stat-label">Total Units Ever</div><div class="stat-val">${ov.total_units}</div><div class="stat-sub">unique AudioMoths</div></div>
     <div class="stat c fade"><div class="stat-label">Active (Last 7d)</div><div class="stat-val">${ov.currently_active}</div><div class="stat-sub">currently deployed</div></div>
     <div class="stat p fade"><div class="stat-label">Total Recordings</div><div class="stat-val">${ov.total_files.toLocaleString()}</div><div class="stat-sub">FLAC files</div></div>
-    <div class="stat a fade"><div class="stat-label">Total Data</div><div class="stat-val" style="font-size:20px">${fmtBytes(ov.total_bytes)}</div><div class="stat-sub">in S3</div></div>`;
+    <div class="stat a fade"><div class="stat-label">Total Data</div><div class="stat-val" style="font-size:22px">${fmtBytes(ov.total_bytes)}</div><div class="stat-sub">in S3</div></div>`;
 }
 
 function setHmMode(mode,btn){
@@ -630,18 +773,53 @@ function renderHeatmap(){
   const max=Math.max(...vals,0.001);
   const map={};daily.forEach(d=>{map[d.date]=d;});
   const first=new Date(daily[0].date),last=new Date(daily[daily.length-1].date);
+  // Start on the Monday on or before the first date (Mon=1 in JS, so offset (dow+6)%7)
   const start=new Date(first);start.setDate(start.getDate()-((start.getDay()+6)%7));
-  const cells=[];const cur=new Date(start);
+
+  const cells=[];
+  const cur=new Date(start);
+  let weekCol=0;
+  const monthLabelPositions={};  // month key → pixel offset
+
   while(cur<=last){
+    const dow=(cur.getDay()+6)%7; // Mon=0 … Sun=6
+    if(dow===0){
+      // Track first occurrence of each month for the x-label
+      const mk=cur.toISOString().slice(0,7);
+      if(!(mk in monthLabelPositions)) monthLabelPositions[mk]=weekCol;
+      weekCol++;
+    }
     const ds=cur.toISOString().slice(0,10),d=map[ds];
     const rawVal=d?(isGb?d.volume_bytes/1e9:d.active_units):0;
     const displayVal=isGb?rawVal.toFixed(2)+' GB':rawVal+' unit'+(rawVal!==1?'s':'');
     const color=isGb?hmColorGb(rawVal,max):hmColorUnits(rawVal,max);
-    cells.push(`<div class="hm-cell" style="background:${color}" title="${fmtDate(ds)}: ${displayVal}"></div>`);
+    const inRange=cur>=first&&cur<=last;
+    cells.push(`<div class="hm-cell" style="background:${inRange?color:'transparent'}" title="${inRange?(fmtDate(ds)+': '+displayVal):''}"></div>`);
     cur.setDate(cur.getDate()+1);
   }
+
   const heatmapEl=document.getElementById('heatmap');
   if(heatmapEl) heatmapEl.innerHTML=cells.join('');
+
+  // Y-axis: Mon/Wed/Fri labels (16px per row = 14px + 2px gap)
+  const yLabels=document.getElementById('hm-y-labels');
+  if(yLabels){
+    const days=['Mon','','Wed','','Fri','',''];
+    yLabels.innerHTML=days.map(d=>`<span style="line-height:14px;display:block;height:14px">${d}</span>`).join('');
+  }
+
+  // X-axis: month labels at computed pixel offsets (16px per week column)
+  const xLabels=document.getElementById('hm-x-labels');
+  if(xLabels){
+    const items=Object.entries(monthLabelPositions).map(([mk,col])=>{
+      const[y,m]=mk.split('-');
+      return `<span class="hm-x-label" style="left:${col*16}px">${MONTHS[parseInt(m,10)-1]}</span>`;
+    });
+    xLabels.innerHTML=items.join('');
+    // Set width so container knows its size
+    const totalWeeks=weekCol;
+    xLabels.style.width=(totalWeeks*16)+'px';
+  }
 
   const legendEl=document.getElementById('hm-legend');
   if(legendEl){
@@ -650,7 +828,7 @@ function renderHeatmap(){
       :[0,Math.round(max*0.2),Math.round(max*0.4),Math.round(max*0.7),Math.round(max)];
     const labels=thresholds.map(v=>isGb?v.toFixed(1)+' GB':v+(v===1?' unit':' units'));
     const colors=isGb?['#111820','#1a1a3a','#2a2a7a','#4444bb','#b57aff']:['#111820','#0d3a2a','#0d6644','#1a9e6a','#3dffa0'];
-    legendEl.innerHTML=labels.map((s,i)=>`<div class="hm-swatch" style="background:${colors[i]}"></div><span>${s}</span>`).join('');
+    legendEl.innerHTML='<span style="margin-right:4px">Less</span>'+labels.map((s,i)=>`<div class="hm-swatch" style="background:${colors[i]}" title="${s}"></div>`).join('')+'<span style="margin-left:4px">More</span>';
   }
 }
 
@@ -670,12 +848,159 @@ function renderVolumeChart(daily){
     backgroundColor:'#b57aff33',borderColor:'#b57aff',borderWidth:1,borderRadius:2}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-        titleColor:'#b8cce0',bodyColor:'#3d5470',titleFont:{family:'IBM Plex Mono',size:10},bodyFont:{family:'IBM Plex Mono',size:10},
+        titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
+        titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
         callbacks:{label:c=>` ${c.parsed.y.toFixed(3)} GB`}}},
-      scales:{x:{ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},maxTicksLimit:12},grid:{display:false}},
-        y:{ticks:{color:'#2a3d55',font:{family:'IBM Plex Mono',size:8},callback:v=>v+'GB'},grid:{color:'#111820'}}}}});
+      scales:{
+        x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:12},grid:{display:false}},
+        y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>v+'GB'},grid:{color:CHART_DEFAULTS.gridColor}}
+      }
+    }
+  });
 }
 
+// ── Leaflet Map ───────────────────────────────────────────────────────────────
+function initMap(){
+  const mapEl=document.getElementById('am-map');
+  if(!mapEl) return;
+  if(_map){_map.remove();_map=null;}
+  _markers={};
+
+  _map=L.map('am-map',{
+    center:[0,0],zoom:2,
+    zoomControl:true,
+    attributionControl:true
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom:19,
+    className:'map-tiles'
+  }).addTo(_map);
+
+  // Dark tile style via CSS
+  const style=document.createElement('style');
+  style.textContent=`.map-tiles{filter:brightness(0.55) contrast(1.2) saturate(0.7) hue-rotate(180deg);}`;
+  document.head.appendChild(style);
+
+  const sevenAgo=new Date();sevenAgo.setDate(sevenAgo.getDate()-7);
+  const sevenStr=sevenAgo.toISOString().slice(0,10);
+
+  if(!_locData.length){
+    document.getElementById('map-status-label').textContent='No GPS coordinates in scan data yet — rescan to extract from FLAC metadata';
+    return;
+  }
+
+  const bounds=[];
+  _locData.forEach(loc=>{
+    const active=loc.last_seen>=sevenStr;
+    const color=active?'#3dffa0':'#3d5470';
+    const icon=L.divIcon({
+      className:'',
+      html:`<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid #0c1118;box-shadow:0 0 ${active?'8px '+color:'none'}"></div>`,
+      iconSize:[10,10],iconAnchor:[5,5]
+    });
+    const marker=L.marker([loc.lat,loc.lon],{icon}).addTo(_map);
+    const serno=loc.am_serno?`<br>AM: ${loc.am_serno}`:'';
+    const pi=loc.pi_serno?`<br>Pi: ${loc.pi_serno}`:'';
+    marker.bindTooltip(`<span style="font-family:monospace;font-size:12px">${loc.unit}${serno}${pi}<br>${loc.total_files.toLocaleString()} recordings · ${loc.active_days}d active</span>`,
+      {className:'',direction:'top'});
+    marker.on('click',()=>selectUnit(loc.unit));
+    _markers[loc.unit]=marker;
+    bounds.push([loc.lat,loc.lon]);
+  });
+
+  if(bounds.length) _map.fitBounds(bounds,{padding:[30,30]});
+  document.getElementById('map-status-label').textContent=`${_locData.length} stations mapped`;
+}
+
+function selectUnit(unitName){
+  // Deselect previous
+  if(_selectedUnit&&_markers[_selectedUnit]){
+    const prev=_locData.find(l=>l.unit===_selectedUnit);
+    if(prev) updateMarkerStyle(_selectedUnit,false,false);
+  }
+  _selectedUnit=unitName;
+  // Highlight marker
+  if(_markers[unitName]) updateMarkerStyle(unitName,true,true);
+  // Highlight table row
+  document.querySelectorAll('#unit-tbody tr').forEach(tr=>{
+    tr.classList.toggle('selected',tr.dataset.unit===unitName);
+  });
+  // Pan map to unit
+  const loc=_locData.find(l=>l.unit===unitName);
+  if(loc&&_map) _map.setView([loc.lat,loc.lon],10,{animate:true});
+  // Load and show daily detail
+  loadUnitDetail(unitName);
+}
+
+function updateMarkerStyle(unitName,selected,active){
+  const marker=_markers[unitName];
+  if(!marker) return;
+  const sevenAgo=new Date();sevenAgo.setDate(sevenAgo.getDate()-7);
+  const sevenStr=sevenAgo.toISOString().slice(0,10);
+  const loc=_locData.find(l=>l.unit===unitName);
+  const isActive=loc?loc.last_seen>=sevenStr:false;
+  const color=selected?'#ffb830':(isActive?'#3dffa0':'#3d5470');
+  const size=selected?14:10;
+  marker.setIcon(L.divIcon({
+    className:'',
+    html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #0c1118;box-shadow:0 0 ${selected?'10px '+color:(isActive?'8px '+color:'none')}"></div>`,
+    iconSize:[size,size],iconAnchor:[size/2,size/2]
+  }));
+}
+
+async function loadUnitDetail(unitName){
+  const panel=document.getElementById('unit-detail-panel');
+  const title=document.getElementById('unit-detail-title');
+  if(!panel||!title) return;
+  panel.style.display='block';
+  title.textContent=unitName+' · Daily Recordings';
+  if(detailChart){detailChart.destroy();detailChart=null;}
+  // Clear canvas
+  const canvas=document.getElementById('detail-chart');
+  if(!canvas) return;
+  try{
+    const{data}=await get('/audiomoth/unit/'+encodeURIComponent(unitName));
+    const daily=data.daily||[];
+    // Update title with serial numbers if available
+    const serials=[data.am_serno&&`AM ${data.am_serno}`,data.pi_serno&&`Pi ${data.pi_serno}`].filter(Boolean).join(' · ');
+    title.textContent=unitName+(serials?' · '+serials:'')+' · Daily Recordings';
+    if(!daily.length){title.textContent=unitName+' · No data';return;}
+    const labels=daily.map(d=>fmtDate(d.date));
+    const counts=daily.map(d=>d.count);
+    const bytes=daily.map(d=>+(d.bytes/1e9).toFixed(3));
+    const ctx=canvas.getContext('2d');
+    detailChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[
+      {label:'Recordings',data:counts,backgroundColor:'#3dffa044',borderColor:'#3dffa0',borderWidth:1,borderRadius:2,yAxisID:'y'},
+      {label:'GB',data:bytes,backgroundColor:'#b57aff44',borderColor:'#b57aff',borderWidth:1,borderRadius:2,yAxisID:'y2',type:'bar'}
+    ]},options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
+        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
+          titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
+          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont}},
+      scales:{
+        x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:16},grid:{display:false}},
+        y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{color:CHART_DEFAULTS.gridColor},title:{display:true,text:'Recordings',color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont}},
+        y2:{position:'right',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>v+'GB'},grid:{drawOnChartArea:false}}
+      }
+    }});
+  }catch(e){title.textContent=unitName+' · Error loading detail';}
+}
+
+function closeUnitDetail(){
+  const panel=document.getElementById('unit-detail-panel');
+  if(panel) panel.style.display='none';
+  if(detailChart){detailChart.destroy();detailChart=null;}
+  if(_selectedUnit){
+    updateMarkerStyle(_selectedUnit,false,false);
+    _selectedUnit=null;
+  }
+  document.querySelectorAll('#unit-tbody tr').forEach(tr=>tr.classList.remove('selected'));
+}
+
+// ── Unit table ────────────────────────────────────────────────────────────────
 function sortTable(col){
   if(_sortCol===col) _sortDir=_sortDir==='asc'?'desc':'asc';
   else{_sortCol=col;_sortDir=(col==='unit'||col==='first_seen'||col==='last_seen')?'asc':'desc';}
@@ -701,11 +1026,14 @@ function renderUnitTable(){
   });
   document.getElementById('unit-count-label').textContent=sorted.length+' units total';
   const maxB=Math.max(...sorted.map(u=>u.total_bytes),1);
+  const hasCoords=new Set(_locData.map(l=>l.unit));
   document.getElementById('unit-tbody').innerHTML=sorted.map(u=>{
     const active=u.last_seen>=sevenStr,pct=(u.total_bytes/maxB*100).toFixed(1);
-    return`<tr>
-      <td style="color:#fff;font-weight:500">${u.unit}</td>
-      <td><span class="status-dot ${active?'active':'inactive'}"></span><span style="font-size:10px;color:${active?'var(--green)':'var(--muted)'}">${active?'Active':'Inactive'}</span></td>
+    const mapPin=hasCoords.has(u.unit)?`<span style="color:var(--accent);margin-left:6px" title="Location on map">⊙</span>`:'';
+    const sel=_selectedUnit===u.unit?' selected':'';
+    return`<tr class="${sel}" data-unit="${u.unit}" onclick="selectUnit('${u.unit.replace(/'/g,"\\'")}')">
+      <td style="color:#fff;font-weight:500">${u.unit}${mapPin}</td>
+      <td><span class="status-dot ${active?'active':'inactive'}"></span><span style="font-size:11px;color:${active?'var(--green)':'var(--muted)'}">${active?'Active':'Inactive'}</span></td>
       <td style="color:var(--muted)">${u.first_seen?fmtDate(u.first_seen):'—'}</td>
       <td style="color:var(--muted)">${u.last_seen?fmtDate(u.last_seen):'—'}</td>
       <td>${u.active_days}d</td><td>${u.total_files.toLocaleString()}</td>
