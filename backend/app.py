@@ -101,7 +101,7 @@ def extract_unit_metadata(tags):
         if k in norm:
             try: lat = float(norm[k]); break
             except: pass
-    for k in ['LON', 'LNG', 'LONGITUDE', 'GPS_LONGITUDE']:
+    for k in ['LON', 'LONG', 'LNG', 'LONGITUDE', 'GPS_LONGITUDE']:
         if k in norm:
             try: lon = float(norm[k]); break
             except: pass
@@ -139,16 +139,18 @@ def _ce_query_all(end, gran, group_by):
     Strategy: try from 2006-01-01; if CE rejects it with a ValidationException
     it tells us the limit in the error message (e.g. '14 months').  We then
     back off by (limit - 1) months so we stay comfortably inside the window."""
+    
+    d = date.today()
+    # Subtract 1 so we land one full month inside the allowed window
+    months_back = 37
+    mo, yr = d.month - months_back, d.year
+    while mo <= 0: mo += 12; yr -= 1
     try:
-        return _ce_query_paginated("2006-01-01", end, gran, group_by)
+        return _ce_query_paginated(f"{yr}-{mo:02d}-01", end, gran, group_by)
     except ClientError as e:
         if e.response["Error"]["Code"] != "ValidationException":
             raise
-        msg = e.response["Error"]["Message"]
-        m = re.search(r'(\d+)\s+months?', msg)
-        # Subtract 1 so we land one full month inside the allowed window
-        months_back = (int(m.group(1)) - 1) if m else 12
-        d = date.today()
+        months_back = 13
         mo, yr = d.month - months_back, d.year
         while mo <= 0: mo += 12; yr -= 1
         return _ce_query_paginated(f"{yr}-{mo:02d}-01", end, gran, group_by)
@@ -194,10 +196,13 @@ def trend():
         start = f"{y}-{m:02d}-01"; gran = "MONTHLY"
     else:  # all — probe CE to find the actual retention boundary
         gran = "MONTHLY"
-        start = _ce_earliest_start(gran)
+        start = None
     end = today_str() if gran == "DAILY" else period_end()
     group_by = [{"Type": "TAG", "Key": TAG_KEY}]
-    all_results = _ce_query_paginated(start, end, gran, group_by)
+    if range_param == "all":
+        all_results = _ce_query_all(end, gran, group_by)
+    else:
+        all_results = _ce_query_paginated(start, end, gran, group_by)
     series = {}; dates = []
     for result in all_results:
         day = result["TimePeriod"]["Start"]; dates.append(day)

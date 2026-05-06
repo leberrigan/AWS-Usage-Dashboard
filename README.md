@@ -115,6 +115,8 @@ curl http://localhost:5000/api/audiomoth/locations
 curl http://localhost:5000/api/audiomoth/units
 ```
 
+sudo journalctl -u aws-cost-dashboard -n 200 --no-pager | grep -i "scan\|flac\|error"
+
 
 
 
