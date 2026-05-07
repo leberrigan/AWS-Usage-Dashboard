@@ -155,6 +155,37 @@ def _ce_query_all(end, gran, group_by):
         while mo <= 0: mo += 12; yr -= 1
         return _ce_query_paginated(f"{yr}-{mo:02d}-01", end, gran, group_by)
 
+def _ce_query_paginated_filtered(start, end, gran, filter_def):
+    """Like _ce_query_paginated but with an optional Filter (None = no filter, returns total)."""
+    results = []
+    kwargs = dict(TimePeriod={"Start": start, "End": end},
+                  Granularity=gran, Metrics=["UnblendedCost"])
+    if filter_def is not None:
+        kwargs["Filter"] = filter_def
+    while True:
+        r = ce().get_cost_and_usage(**kwargs)
+        results.extend(r["ResultsByTime"])
+        if "NextPageToken" not in r:
+            break
+        kwargs["NextPageToken"] = r["NextPageToken"]
+    return results
+
+def _ce_query_all_filtered(end, gran, filter_def):
+    """Like _ce_query_all but with a Filter instead of GroupBy."""
+    d = date.today()
+    months_back = 37
+    mo, yr = d.month - months_back, d.year
+    while mo <= 0: mo += 12; yr -= 1
+    try:
+        return _ce_query_paginated_filtered(f"{yr}-{mo:02d}-01", end, gran, filter_def)
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ValidationException":
+            raise
+        months_back = 13
+        mo, yr = d.month - months_back, d.year
+        while mo <= 0: mo += 12; yr -= 1
+        return _ce_query_paginated_filtered(f"{yr}-{mo:02d}-01", end, gran, filter_def)
+
 # ── Cost Explorer (protected) ─────────────────────────────────────────────────
 
 @app.route("/api/summary")
@@ -167,7 +198,7 @@ def summary():
     for result in r["ResultsByTime"]:
         month=result["TimePeriod"]["Start"][:7]
         for g in result["Groups"]:
-            tag=g["Keys"][0].replace(f"{TAG_KEY}$","") or "(untagged)"
+            tag=g["Keys"][0].replace(f"{TAG_KEY}$","") or "ampi"
             svc=g["Keys"][1]; cost=float(g["Metrics"]["UnblendedCost"]["Amount"])
             if cost<0.001: continue
             if tag not in projects: projects[tag]={"total":0.0,"services":{},"monthly":{}}
@@ -207,7 +238,7 @@ def trend():
     for result in all_results:
         day = result["TimePeriod"]["Start"]; dates.append(day)
         for g in result["Groups"]:
-            tag = g["Keys"][0].replace(f"{TAG_KEY}$", "") or "(untagged)"
+            tag = g["Keys"][0].replace(f"{TAG_KEY}$", "") or "ampi"
             cost = float(g["Metrics"]["UnblendedCost"]["Amount"])
             series.setdefault(tag, []).append({"date": day, "cost": round(cost, 4)})
     return jsonify({"dates": dates, "series": series, "granularity": gran})
@@ -237,6 +268,65 @@ def services():
             svc=g["Keys"][0]; cost=float(g["Metrics"]["UnblendedCost"]["Amount"])
             if cost>=0.01: svcs[svc]=svcs.get(svc,0.0)+cost
     return jsonify({"services":dict(sorted(svcs.items(),key=lambda x:x[1],reverse=True))})
+
+@app.route("/api/ampi/costs")
+@requires_auth
+def ampi_costs():
+    # Costs tagged 'ampi' OR with no Project tag (all pre-tagging history is untagged)
+    ampi_filter = {"Or": [
+        {"Tags": {"Key": TAG_KEY, "Values": ["ampi"]}},
+        {"Tags": {"Key": TAG_KEY, "MatchOptions": ["ABSENT"]}}
+    ]}
+    today = date.today()
+
+    monthly_results = []
+    try:
+        monthly_results = _ce_query_all_filtered(period_end(), "MONTHLY", ampi_filter)
+    except Exception:
+        pass
+
+    daily_results = []
+    try:
+        start_3m = (today - timedelta(days=91)).strftime("%Y-%m-%d")
+        daily_results = _ce_query_paginated_filtered(start_3m, today_str(), "DAILY", ampi_filter)
+    except Exception:
+        pass
+
+    monthly_costs = {}
+    for result in monthly_results:
+        month = result["TimePeriod"]["Start"][:7]
+        cost = float(result["Total"]["UnblendedCost"]["Amount"])
+        if cost > 0.001:
+            monthly_costs[month] = monthly_costs.get(month, 0) + cost
+
+    total_cost = sum(monthly_costs.values())
+    d3m = (today - timedelta(days=91)).strftime("%Y-%m")
+    three_month_cost = sum(v for k, v in monthly_costs.items() if k >= d3m)
+
+    cache = load_cache()
+    monthly_stations = {m["month"]: m["active_units"] for m in cache.get("monthly", [])} if cache else {}
+
+    daily_series = []
+    for result in daily_results:
+        day = result["TimePeriod"]["Start"]
+        cost = float(result["Total"]["UnblendedCost"]["Amount"])
+        stations = monthly_stations.get(day[:7], 0)
+        cps = round(cost / stations, 6) if stations > 0 else None
+        daily_series.append({"date": day, "cost": round(cost, 4),
+                              "active_stations": stations, "cost_per_station": cps})
+
+    monthly_series = [
+        {"month": k, "cost": round(v, 4),
+         "active_stations": monthly_stations.get(k, 0),
+         "cost_per_station": round(v / monthly_stations[k], 4) if monthly_stations.get(k, 0) > 0 else None}
+        for k, v in sorted(monthly_costs.items())
+    ]
+    return jsonify({
+        "total_cost": round(total_cost, 2),
+        "three_month_cost": round(three_month_cost, 2),
+        "daily": daily_series,
+        "monthly": monthly_series
+    })
 
 # ── AudioMoth (public) ────────────────────────────────────────────────────────
 

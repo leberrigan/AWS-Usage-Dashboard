@@ -128,8 +128,8 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 .unit-detail-panel{display:none;border-top:1px solid var(--border);padding:18px;}
 .unit-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .unit-detail-title{font-family:var(--mono);font-size:13px;color:#fff;}
-.unit-detail-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;}
-.unit-detail-close:hover{color:var(--text);}
+.unit-detail-close{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:3px 10px;cursor:pointer;border-radius:2px;letter-spacing:.06em;transition:all .15s;}
+.unit-detail-close:hover{border-color:var(--text);color:var(--text);}
 .detail-chart-wrap{position:relative;height:180px;}
 @media(max-width:860px){.stats-row,.am-stats{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}}
 </style>
@@ -226,6 +226,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
       <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
       <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
     </div>
+    <div id="ampi-cost-panel" style="display:none;gap:14px;margin-bottom:24px"></div>
     <div class="panel">
       <div class="panel-head">
         <span class="panel-title" id="hm-title">Active Units Per Day</span>
@@ -255,7 +256,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
       <div class="unit-detail-panel" id="unit-detail-panel">
         <div class="unit-detail-header">
           <span class="unit-detail-title" id="unit-detail-title">—</span>
-          <button class="unit-detail-close" onclick="closeUnitDetail()">✕</button>
+          <button class="unit-detail-close" onclick="closeUnitDetail()">Clear</button>
         </div>
         <div class="detail-chart-wrap"><canvas id="detail-chart"></canvas></div>
       </div>
@@ -276,6 +277,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
         <span class="panel-title">Unit Registry</span>
         <div style="display:flex;align-items:center;gap:12px">
           <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="unit-count-label"></span>
+          <button class="range-btn" onclick="downloadUnitsJson()" title="Download units as JSON">↓ JSON</button>
           <button class="rescan-btn locked" id="rescan-btn" onclick="tryRescan()">↺ RESCAN</button>
         </div>
       </div>
@@ -289,6 +291,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
             <th class="sortable" onclick="sortTable('active_days')">Active Days</th>
             <th class="sortable" onclick="sortTable('total_files')">Recordings</th>
             <th class="sortable" onclick="sortTable('total_bytes')">Data Volume</th>
+            <th id="unit-cost-th" style="display:none">Est. Cost</th>
           </tr></thead>
           <tbody id="unit-tbody"></tbody>
         </table>
@@ -311,6 +314,7 @@ let _hmMode='units',_dailySeries=[];
 let _trendRange='30d';
 let _authed=false,_authCreds=null;
 let _map=null,_markers={},_selectedUnit=null,_locData=[];
+let _ampiCosts=null;
 
 // ── Date formatting ──────────────────────────────────────────────────────────
 function fmtMonth(ym){
@@ -652,6 +656,15 @@ async function loadAudioMoth(){
     renderCostPerStation();
     if(data.scanned_at) showInfo('am-info',
       '✓ Data from scan at '+fmtDate(data.scanned_at.slice(0,10))+' '+data.scanned_at.slice(11,16)+' UTC · click ↺ RESCAN to refresh');
+    if(_authed){
+      try{
+        const ac=await get('/ampi/costs',true);
+        _ampiCosts=ac.data;
+        renderAmpiCostStats();
+        renderUnitTable();
+        updateMapTooltips();
+      }catch(e){_ampiCosts=null;}
+    }
   }catch(e){showErr('am-error',e.message);}
 }
 
@@ -661,6 +674,7 @@ function restoreAmContent(){
       <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
       <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
     </div>
+    <div id="ampi-cost-panel" style="display:none;gap:14px;margin-bottom:24px"></div>
     <div class="panel">
       <div class="panel-head">
         <span class="panel-title" id="hm-title">${_hmMode==='units'?'Active Units Per Day':'Data Uploaded Per Day (GB)'}</span>
@@ -690,7 +704,7 @@ function restoreAmContent(){
       <div class="unit-detail-panel" id="unit-detail-panel">
         <div class="unit-detail-header">
           <span class="unit-detail-title" id="unit-detail-title">—</span>
-          <button class="unit-detail-close" onclick="closeUnitDetail()">✕</button>
+          <button class="unit-detail-close" onclick="closeUnitDetail()">Clear</button>
         </div>
         <div class="detail-chart-wrap"><canvas id="detail-chart"></canvas></div>
       </div>
@@ -711,6 +725,7 @@ function restoreAmContent(){
         <span class="panel-title">Unit Registry</span>
         <div style="display:flex;align-items:center;gap:12px">
           <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="unit-count-label"></span>
+          <button class="range-btn" onclick="downloadUnitsJson()" title="Download units as JSON">↓ JSON</button>
           <button class="rescan-btn ${_authed?'':'locked'}" id="rescan-btn" onclick="tryRescan()">↺ RESCAN</button>
         </div>
       </div>
@@ -724,6 +739,7 @@ function restoreAmContent(){
             <th class="sortable" onclick="sortTable('active_days')">Active Days</th>
             <th class="sortable" onclick="sortTable('total_files')">Recordings</th>
             <th class="sortable" onclick="sortTable('total_bytes')">Data Volume</th>
+            <th id="unit-cost-th" style="display:none">Est. Cost</th>
           </tr></thead>
           <tbody id="unit-tbody"></tbody>
         </table>
@@ -859,6 +875,55 @@ function renderVolumeChart(daily){
   });
 }
 
+function renderAmpiCostStats(){
+  const panel=document.getElementById('ampi-cost-panel');
+  if(!panel) return;
+  if(!_authed||!_ampiCosts){panel.style.display='none';return;}
+  panel.style.cssText='display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:24px';
+  panel.innerHTML=`
+    <div class="stat c fade"><div class="stat-label">AMPI · Total Cost</div><div class="stat-val" style="font-size:22px">${fmt(_ampiCosts.total_cost)}</div><div class="stat-sub">all time</div></div>
+    <div class="stat a fade"><div class="stat-label">AMPI · Last 3 Months</div><div class="stat-val" style="font-size:22px">${fmt(_ampiCosts.three_month_cost)}</div><div class="stat-sub">past 90 days</div></div>`;
+}
+
+function downloadUnitsJson(){
+  if(!_unitData||!_unitData.length) return;
+  const blob=new Blob([JSON.stringify(_unitData,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='audiomoth-units.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function unitTotalCost(unitName){
+  if(!_authed||!_ampiCosts||!_ampiCosts.monthly) return null;
+  const unit=_unitData.find(u=>u.unit===unitName);
+  if(!unit) return null;
+  const monthMap={};
+  _ampiCosts.monthly.forEach(m=>{monthMap[m.month]=m;});
+  let total=0,hasData=false;
+  Object.keys(unit.monthly||{}).forEach(month=>{
+    const am=monthMap[month];
+    if(am&&am.cost_per_station!=null){total+=am.cost_per_station;hasData=true;}
+  });
+  return hasData?total:null;
+}
+
+function updateMapTooltips(){
+  if(!_locData.length) return;
+  const sevenAgo=new Date();sevenAgo.setDate(sevenAgo.getDate()-7);
+  const sevenStr=sevenAgo.toISOString().slice(0,10);
+  _locData.forEach(loc=>{
+    const marker=_markers[loc.unit];
+    if(!marker) return;
+    const serno=loc.am_serno?`<br>AM: ${loc.am_serno}`:'';
+    const pi=loc.pi_serno?`<br>Pi: ${loc.pi_serno}`:'';
+    const cost=unitTotalCost(loc.unit);
+    const costStr=cost!=null?`<br><span style="color:#ffb830">${fmt(cost)} est. total</span>`:'';
+    marker.setTooltipContent(`<span style="font-family:monospace;font-size:12px">${loc.unit}${serno}${pi}<br>${loc.total_files.toLocaleString()} recordings · ${loc.active_days}d active${costStr}</span>`);
+  });
+}
+
 // ── Leaflet Map ───────────────────────────────────────────────────────────────
 function initMap(){
   const mapEl=document.getElementById('am-map');
@@ -970,20 +1035,55 @@ async function loadUnitDetail(unitName){
     const labels=daily.map(d=>fmtDate(d.date));
     const counts=daily.map(d=>d.count);
     const bytes=daily.map(d=>+(d.bytes/1e9).toFixed(3));
-    const ctx=canvas.getContext('2d');
-    detailChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[
+    // Unit cost/day = AMPI cost × (this unit's bytes that day / total bytes that day)
+    const dailyAmpiCostMap={},monthlyAmpiCostMap={};
+    const totalDailyBytesMap={},totalMonthlyBytesMap={};
+    if(_authed&&_ampiCosts){
+      (_ampiCosts.daily||[]).forEach(d=>{if(d.cost!=null)dailyAmpiCostMap[d.date]=d.cost;});
+      (_ampiCosts.monthly||[]).forEach(m=>{if(m.cost!=null)monthlyAmpiCostMap[m.month]=m.cost;});
+    }
+    (_dailySeries||[]).forEach(d=>{totalDailyBytesMap[d.date]=d.volume_bytes;});
+    (_monthlyData||[]).forEach(m=>{totalMonthlyBytesMap[m.month]=m.total_bytes;});
+    const hasCost=_authed&&_ampiCosts&&(Object.keys(dailyAmpiCostMap).length||Object.keys(monthlyAmpiCostMap).length);
+    const costData=hasCost?daily.map(d=>{
+      if(dailyAmpiCostMap[d.date]!=null){
+        // Daily window: exact daily AMPI cost × this unit's share of that day's bytes
+        const tot=totalDailyBytesMap[d.date]||0;
+        return (tot>0&&d.bytes>0)?dailyAmpiCostMap[d.date]*(d.bytes/tot):null;
+      }
+      // Monthly fallback: unit's actual daily bytes as share of total monthly bytes × monthly cost
+      // Using d.bytes (real per-day upload) not a flat monthly average, so shape varies per unit
+      const mk=d.date.slice(0,7);
+      const ampiM=monthlyAmpiCostMap[mk];
+      if(ampiM==null) return null;
+      const totM=totalMonthlyBytesMap[mk]||0;
+      return (totM>0&&d.bytes>0)?ampiM*(d.bytes/totM):null;
+    }):null;
+    const datasets=[
       {label:'Recordings',data:counts,backgroundColor:'#3dffa044',borderColor:'#3dffa0',borderWidth:1,borderRadius:2,yAxisID:'y'},
       {label:'GB',data:bytes,backgroundColor:'#b57aff44',borderColor:'#b57aff',borderWidth:1,borderRadius:2,yAxisID:'y2',type:'bar'}
-    ]},options:{
+    ];
+    if(costData) datasets.push({label:'Unit cost/day',data:costData,
+      borderColor:'#ffb830',borderWidth:2,pointRadius:0,tension:0.3,fill:false,
+      type:'line',yAxisID:'y3',spanGaps:true});
+    const ctx=canvas.getContext('2d');
+    detailChart=new Chart(ctx,{type:'bar',data:{labels,datasets},options:{
       responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
       plugins:{legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
         tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
           titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont}},
+          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+          callbacks:{label:c=>{
+            if(c.dataset.yAxisID==='y3') return c.parsed.y!=null?` Unit cost: $${c.parsed.y.toFixed(4)}`:null;
+            if(c.dataset.yAxisID==='y2') return ` ${c.parsed.y.toFixed(3)} GB`;
+            return ` ${c.parsed.y} recordings`;
+          }}}},
       scales:{
         x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:16},grid:{display:false}},
         y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{color:CHART_DEFAULTS.gridColor},title:{display:true,text:'Recordings',color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont}},
-        y2:{position:'right',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>v+'GB'},grid:{drawOnChartArea:false}}
+        y2:{position:'right',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>v+'GB'},grid:{drawOnChartArea:false}},
+        y3:{display:costData!=null,position:'right',offset:true,ticks:{color:'#ffb830',font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(3)},grid:{drawOnChartArea:false}}
       }
     }});
   }catch(e){title.textContent=unitName+' · Error loading detail';}
@@ -998,6 +1098,7 @@ function closeUnitDetail(){
     _selectedUnit=null;
   }
   document.querySelectorAll('#unit-tbody tr').forEach(tr=>tr.classList.remove('selected'));
+  if(_map&&_locData.length) _map.fitBounds(_locData.map(l=>[l.lat,l.lon]),{padding:[30,30]});
 }
 
 // ── Unit table ────────────────────────────────────────────────────────────────
@@ -1025,12 +1126,17 @@ function renderUnitTable(){
     if(col===_sortCol) th.classList.add(_sortDir==='asc'?'sort-asc':'sort-desc');
   });
   document.getElementById('unit-count-label').textContent=sorted.length+' units total';
+  const showCost=_authed&&!!_ampiCosts;
+  const costTh=document.getElementById('unit-cost-th');
+  if(costTh) costTh.style.display=showCost?'':'none';
   const maxB=Math.max(...sorted.map(u=>u.total_bytes),1);
   const hasCoords=new Set(_locData.map(l=>l.unit));
   document.getElementById('unit-tbody').innerHTML=sorted.map(u=>{
     const active=u.last_seen>=sevenStr,pct=(u.total_bytes/maxB*100).toFixed(1);
     const mapPin=hasCoords.has(u.unit)?`<span style="color:var(--accent);margin-left:6px" title="Location on map">⊙</span>`:'';
     const sel=_selectedUnit===u.unit?' selected':'';
+    const cost=showCost?unitTotalCost(u.unit):null;
+    const costTd=showCost?`<td style="color:var(--amber)">${cost!=null?fmt(cost):'—'}</td>`:'<td style="display:none"></td>';
     return`<tr class="${sel}" data-unit="${u.unit}" onclick="selectUnit('${u.unit.replace(/'/g,"\\'")}')">
       <td style="color:#fff;font-weight:500">${u.unit}${mapPin}</td>
       <td><span class="status-dot ${active?'active':'inactive'}"></span><span style="font-size:11px;color:${active?'var(--green)':'var(--muted)'}">${active?'Active':'Inactive'}</span></td>
@@ -1038,6 +1144,7 @@ function renderUnitTable(){
       <td style="color:var(--muted)">${u.last_seen?fmtDate(u.last_seen):'—'}</td>
       <td>${u.active_days}d</td><td>${u.total_files.toLocaleString()}</td>
       <td><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%"></div></div><span style="color:var(--text);white-space:nowrap">${fmtBytes(u.total_bytes)}</span></div></td>
+      ${costTd}
     </tr>`;}).join('');
 }
 
