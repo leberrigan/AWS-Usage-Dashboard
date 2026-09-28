@@ -28,8 +28,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
 .auth-badge{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:2px;border:1px solid;}
 .auth-badge.in{color:var(--green);border-color:var(--green);}
-.auth-badge.out{color:var(--muted);border-color:var(--border);cursor:pointer;}
-.auth-badge.out:hover{border-color:var(--accent);color:var(--accent);}
+.auth-badge.out{color:var(--muted);border-color:var(--border);}
 .tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 28px;}
 .tab-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:0.08em;padding:12px 20px;cursor:pointer;transition:all 0.2s;margin-bottom:-1px;text-transform:uppercase;}
 .tab-btn:hover{color:var(--text);}
@@ -37,19 +36,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .tab-btn.locked{opacity:0.35;cursor:default;}
 .tab-pane{display:none;}
 .tab-pane.active{display:block;}
-/* login overlay */
-.login-overlay{position:fixed;inset:0;background:rgba(8,12,16,0.92);display:flex;align-items:center;justify-content:center;z-index:500;}
-.login-box{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:36px 40px;width:340px;}
-.login-title{font-family:var(--mono);font-size:14px;color:#fff;margin-bottom:24px;letter-spacing:.06em;}
-.login-field{margin-bottom:14px;}
-.login-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:6px;}
-.login-input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 12px;border-radius:2px;outline:none;}
-.login-input:focus{border-color:var(--accent);}
-.login-btn{width:100%;margin-top:8px;background:var(--accent);border:none;color:var(--bg);font-family:var(--mono);font-size:12px;font-weight:600;padding:10px;border-radius:2px;cursor:pointer;letter-spacing:.08em;transition:opacity .2s;}
-.login-btn:hover{opacity:.85;}
-.login-err{font-family:var(--mono);font-size:11px;color:var(--red);margin-top:10px;display:none;}
-.login-skip{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-top:14px;cursor:pointer;}
-.login-skip:hover{color:var(--text);}
 main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 .error-bar{display:none;background:#140608;border:1px solid var(--red);color:#ff8fa3;font-family:var(--mono);font-size:12px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
 .info-bar{display:none;background:#0a1a10;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:12px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
@@ -136,24 +122,6 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 </head>
 <body>
 
-<!-- Login overlay -->
-<div class="login-overlay" id="login-overlay" style="display:none">
-  <div class="login-box">
-    <div class="login-title">⬡ Motus AWS / ADMIN</div>
-    <div class="login-field">
-      <label class="login-label">Username</label>
-      <input class="login-input" type="text" id="login-user" autocomplete="username">
-    </div>
-    <div class="login-field">
-      <label class="login-label">Password</label>
-      <input class="login-input" type="password" id="login-pass" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <button class="login-btn" onclick="doLogin()">SIGN IN</button>
-    <div class="login-err" id="login-err">Incorrect username or password.</div>
-    <div class="login-skip" onclick="closeLogin()">Continue without signing in →</div>
-  </div>
-</div>
-
 <header>
   <div class="brand">
     <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -164,14 +132,13 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     <span class="brand-name">Motus <em>/</em> AWS</span>
   </div>
   <div class="header-right">
-    <div class="period-tag" id="period-label">Last 12 months</div>
-    <div class="auth-badge out" id="auth-badge" onclick="showLogin()">SIGN IN</div>
+    <div class="auth-badge out" id="auth-badge"></div>
     <button class="refresh-btn" onclick="reloadActive()">↺ REFRESH</button>
   </div>
 </header>
 
 <div class="tab-bar">
-  <button class="tab-btn" id="tab-btn-costs" onclick="clickCostsTab(this)"><span style="margin-right:7px">$</span>AWS COSTS</button>
+  <button class="tab-btn locked" id="tab-btn-costs" onclick="clickCostsTab(this)"><span style="margin-right:7px">$</span>AWS COSTS</button>
   <button class="tab-btn active" id="tab-btn-audiomoth" onclick="switchTab('audiomoth',this)"><span style="margin-right:7px">◉</span>AUDIOMOTH UNITS</button>
 </div>
 
@@ -190,23 +157,32 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     </div>
     <div class="panel-body"><div class="stacked-chart-wrap"><canvas id="stacked-chart"></canvas></div></div>
   </div>
-  <div class="grid2">
-    <div class="panel">
-      <div class="panel-head">
-        <span class="panel-title">Spend Trend</span>
-        <div class="range-btns">
-          <button class="range-btn" onclick="setRange('7d',this)">7D</button>
-          <button class="range-btn active" onclick="setRange('30d',this)">30D</button>
-          <button class="range-btn" onclick="setRange('3m',this)">3M</button>
-          <button class="range-btn" onclick="setRange('1y',this)">1Y</button>
-          <button class="range-btn" onclick="setRange('all',this)">ALL</button>
-        </div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Spend Trend</span>
+      <div class="range-btns" id="trend-group-btns">
+        <button class="range-btn active" onclick="setGroup('project',this)">PROJECT</button>
+        <button class="range-btn" onclick="setGroup('service',this)">SERVICE</button>
+        <button class="range-btn" onclick="setGroup('audio',this)">AUDIO</button>
       </div>
-      <div class="panel-body"><div class="chart-wrap"><canvas id="trend-chart"></canvas></div></div>
+      <div class="range-btns">
+        <button class="range-btn" onclick="setRange('7d',this)">7D</button>
+        <button class="range-btn active" onclick="setRange('30d',this)">30D</button>
+        <button class="range-btn" onclick="setRange('3m',this)">3M</button>
+        <button class="range-btn" onclick="setRange('1y',this)">1Y</button>
+        <button class="range-btn" onclick="setRange('all',this)">ALL</button>
+      </div>
     </div>
+    <div class="panel-body"><div class="chart-wrap"><canvas id="trend-chart"></canvas></div></div>
+  </div>
+  <div class="grid2">
     <div class="panel">
       <div class="panel-head"><span class="panel-title">Top Services · Last 30d</span></div>
       <div class="panel-body"><div class="svc-chart-wrap"><canvas id="svc-chart"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Projects · Last 30d</span></div>
+      <div class="panel-body"><div class="svc-chart-wrap"><canvas id="prj-chart"></canvas></div></div>
     </div>
   </div>
   <div class="panel" id="cost-per-station-panel" style="display:none">
@@ -302,17 +278,21 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 </div>
 
 <script>
+// Served from /aws-costs/ on the unified host (not the domain root), so API
+// calls must be prefixed to match nginx's /aws-costs/api/ proxy location.
+window.API_BASE=window.API_BASE||'/aws-costs';
 const API=(window.API_BASE||'')+'/api';
 const PAL=['#00d4ff','#3dffa0','#ffb830','#ff4d6d','#b57aff','#ff6b35','#06d6a0','#f4a261','#a8dadc','#e9c46a'];
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-let trendChart=null,volumeChart=null,stackedChart=null,svcChart=null,cpsChart=null,detailChart=null;
+let trendChart=null,volumeChart=null,stackedChart=null,svcChart=null,prjChart=null,cpsChart=null,detailChart=null;
 let amLoaded=false,costsLoaded=false,scanPollTimer=null;
 let _summaryData=null,_trendData=null,_amOverview=null,_monthlyData=null;
 let _unitData=[],_sortCol='last_seen',_sortDir='desc';
 let _hmMode='units',_dailySeries=[];
 let _trendRange='30d';
-let _authed=false,_authCreds=null;
+let _trendGroup='project';
+let _authed=false;
 let _map=null,_markers={},_selectedUnit=null,_locData=[];
 let _ampiCosts=null;
 
@@ -327,44 +307,38 @@ function fmtDate(ymd){
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
-function showLogin(){document.getElementById('login-overlay').style.display='flex';document.getElementById('login-user').focus();}
-function closeLogin(){document.getElementById('login-overlay').style.display='none';}
-
-async function doLogin(){
-  const user=document.getElementById('login-user').value;
-  const pass=document.getElementById('login-pass').value;
-  const creds=btoa(user+':'+pass);
-  const r=await fetch(API+'/auth/check',{headers:{'Authorization':'Basic '+creds}});
-  if(r.ok){
-    _authed=true; _authCreds=creds;
-    closeLogin(); updateAuthUI();
-    if(!costsLoaded) loadCosts();
-  } else {
-    document.getElementById('login-err').style.display='block';
-  }
+// Identity comes from oauth2-proxy (GitHub OAuth) at the host level — there's
+// no in-app login. We just ask the backend whether *this* signed-in person
+// has the admin role for aws-costs (the only role that unlocks cost data).
+async function checkAuth(){
+  try{
+    const r=await get('/auth/check');
+    _authed=!!r.data.authenticated;
+    updateAuthUI(r.data.name);
+  }catch(e){ _authed=false; updateAuthUI(null); }
 }
 
-function updateAuthUI(){
+function updateAuthUI(name){
   const badge=document.getElementById('auth-badge');
   const costsBtn=document.getElementById('tab-btn-costs');
   const rescanBtn=document.getElementById('rescan-btn');
   if(_authed){
-    badge.textContent='SIGNED IN'; badge.className='auth-badge in'; badge.onclick=null;
+    badge.textContent=name?('ADMIN · '+name):'ADMIN'; badge.className='auth-badge in';
     costsBtn.classList.remove('locked');
     if(rescanBtn) rescanBtn.classList.remove('locked');
   } else {
-    badge.textContent='SIGN IN'; badge.className='auth-badge out'; badge.onclick=showLogin;
+    badge.textContent='VIEW ONLY'; badge.className='auth-badge out';
     costsBtn.classList.add('locked');
     if(rescanBtn) rescanBtn.classList.add('locked');
   }
 }
 
 function clickCostsTab(btn){
-  if(!_authed){showLogin();return;}
+  if(!_authed) return;
   switchTab('costs',btn);
   if(!costsLoaded) loadCosts();
 }
-function tryRescan(){if(!_authed){showLogin();return;} triggerRescan();}
+function tryRescan(){if(!_authed)return; triggerRescan();}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function switchTab(name,btn){
@@ -387,9 +361,10 @@ function fmtBytes(b){
   if(b>=1e6)  return (b/1e6).toFixed(1)+' MB';
   return (b/1e3).toFixed(0)+' KB';
 }
-async function get(p,auth){
-  const headers=auth&&_authCreds?{'Authorization':'Basic '+_authCreds}:{};
-  const r=await fetch(API+p,{headers});
+async function get(p){
+  // Identity travels via nginx's X-Auth-Request-Email header, set from the
+  // oauth2-proxy session cookie — nothing for the client to attach here.
+  const r=await fetch(API+p);
   if(!r.ok&&r.status!==202) throw new Error('HTTP '+r.status);
   return{status:r.status,data:await r.json()};
 }
@@ -410,24 +385,27 @@ const CHART_DEFAULTS={
 async function loadCosts(){
   document.getElementById('cost-error').style.display='none';
   try{
-    const[s,f,sv,tr]=await Promise.all([
-      get('/summary',true),get('/forecast',true),get('/services',true),get('/trend?range=30d',true)
+    const[s,f,sv,pr,tr]=await Promise.all([
+      get('/summary'),get('/forecast'),get('/services'),get('/projects'),
+      get('/trend?range='+_trendRange+'&group='+_trendGroup)
     ]);
     _summaryData=s.data; _trendData=tr.data;
     costsLoaded=true;
     renderCostStats(s.data,f.data);
     renderStackedChart(s.data.projects);
     renderSvcChart(sv.data.services);
+    renderProjectChart(pr.data.projects);
     renderTrendChart();
     renderCostPerStation();
-    document.getElementById('period-label').textContent=
-      fmtMonth(s.data.period.start.slice(0,7))+' → '+fmtMonth(s.data.period.end.slice(0,7));
   }catch(e){showErr('cost-error',e.message);}
 }
 
 function renderCostStats(summary,forecast){
   const projects=summary.projects,names=Object.keys(projects);
-  const total=names.reduce((s,k)=>s+projects[k].total,0),top=names[0]||'—';
+  const total=names.reduce((s,k)=>s+projects[k].total,0);
+  // Pick by actual highest total rather than trusting key order — don't
+  // assume the API response arrived pre-sorted by cost.
+  const top=names.reduce((best,k)=>(!best||projects[k].total>projects[best].total)?k:best,null)||'—';
   document.getElementById('cost-stats').innerHTML=`
     <div class="stat c fade"><div class="stat-label">Total · Period</div><div class="stat-val">${fmt(total)}</div><div class="stat-sub">${names.length} projects</div></div>
     <div class="stat a fade"><div class="stat-label">Month to Date</div><div class="stat-val">${fmt(forecast.mtd)}</div><div class="stat-sub">${forecast.month}</div></div>
@@ -469,23 +447,93 @@ function renderStackedChart(projects){
 
 async function setRange(range,btn){
   _trendRange=range;
-  document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));
+  btn.parentElement.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   try{
-    const tr=await get('/trend?range='+range,true);
-    _trendData=tr.data;
+    if(_trendGroup==='audio') await ensureAmpiCosts();
+    else{const tr=await get('/trend?range='+range+'&group='+_trendGroup); _trendData=tr.data;}
     renderTrendChart();
   }catch(e){showErr('cost-error',e.message);}
 }
 
+async function setGroup(group,btn){
+  _trendGroup=group;
+  btn.parentElement.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  try{
+    if(group==='audio') await ensureAmpiCosts();
+    else{const tr=await get('/trend?range='+_trendRange+'&group='+group); _trendData=tr.data;}
+    renderTrendChart();
+  }catch(e){showErr('cost-error',e.message);}
+}
+
+// Fetches once and caches — /api/ampi/costs already filters to ampi-tagged +
+// legacy-untagged usage and computes active_stations/cost_per_station for us,
+// and this avoids paying for a repeat Cost Explorer API call on every toggle.
+async function ensureAmpiCosts(){
+  if(_ampiCosts) return;
+  const ac=await get('/ampi/costs');
+  _ampiCosts=ac.data;
+}
+
+// "Audio" trend view: units + ampi-only cost/unit, instead of per-project/
+// per-service cost lines. Built from the daily/monthly arrays /api/ampi/costs
+// already returns, filtered client-side to match the selected range.
+function renderAudioTrendChart(ctx){
+  if(!_ampiCosts) return;
+  const useDaily=_trendRange==='7d'||_trendRange==='30d'||_trendRange==='3m';
+  let rows;
+  if(useDaily){
+    const days=_trendRange==='7d'?7:_trendRange==='30d'?30:91;
+    const cutoff=new Date(Date.now()-days*86400000).toISOString().slice(0,10);
+    rows=(_ampiCosts.daily||[]).filter(r=>r.date>=cutoff);
+  }else{
+    rows=_ampiCosts.monthly||[];
+    if(_trendRange==='1y'){
+      const c=new Date(); c.setMonth(c.getMonth()-12);
+      const cutoffKey=c.toISOString().slice(0,7);
+      rows=rows.filter(r=>r.month>=cutoffKey);
+    }
+  }
+  if(!rows.length) return;
+  const gran=useDaily?'DAILY':'MONTHLY';
+  const labels=rows.map(r=>gran==='MONTHLY'?fmtMonth(r.month):fmtDate(r.date));
+  const datasets=[
+    {label:'Active units',data:rows.map(r=>r.active_stations||0),
+      borderColor:'#ffffff88',borderWidth:1.5,borderDash:[4,3],pointRadius:0,tension:0.3,fill:false,yAxisID:'y2'},
+    {label:'Cost per unit (ampi)',data:rows.map(r=>r.cost_per_station!=null?+r.cost_per_station.toFixed(2):null),
+      borderColor:PAL[0],borderWidth:1.5,pointRadius:0,tension:0.3,fill:false,yAxisID:'y',spanGaps:true}
+  ];
+  trendChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
+      tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
+        titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
+        titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+        callbacks:{label:c=>c.dataset.yAxisID==='y2'?` ${c.dataset.label}: ${c.parsed.y} units`:` ${c.dataset.label}: ${c.parsed.y==null?'—':'$'+c.parsed.y.toFixed(2)}`}}
+    },
+    scales:{
+      x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:12},grid:{color:CHART_DEFAULTS.gridColor}},
+      y:{position:'left',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(2)},grid:{color:CHART_DEFAULTS.gridColor}},
+      y2:{display:true,position:'right',ticks:{color:'#7a9ab0',font:CHART_DEFAULTS.tickFont,callback:v=>v+' u'},grid:{drawOnChartArea:false}}
+    }
+  }});
+}
+
 function renderTrendChart(){
-  if(!_trendData) return;
   if(trendChart){trendChart.destroy();trendChart=null;}
+  if(_trendGroup==='audio'){renderAudioTrendChart(document.getElementById('trend-chart').getContext('2d'));return;}
+  if(!_trendData) return;
   const dates=_trendData.dates;
   if(!dates||!dates.length) return;
   const gran=_trendData.granularity||'DAILY';
   const labels=dates.map(d=>gran==='MONTHLY'?fmtMonth(d.slice(0,7)):fmtDate(d));
-  const names=Object.keys(_trendData.series);
+  // Rank by total cost over the window so the busiest projects/services win
+  // the (limited) 8 plotted lines, instead of whatever order the API returned.
+  const names=Object.keys(_trendData.series).sort((a,b)=>
+    (_trendData.series[b]||[]).reduce((s,pt)=>s+pt.cost,0)-(_trendData.series[a]||[]).reduce((s,pt)=>s+pt.cost,0));
   const datasets=names.slice(0,8).map((name,i)=>{
     const map={};(_trendData.series[name]||[]).forEach(pt=>{map[pt.date]=pt.cost;});
     return{label:name,data:dates.map(d=>map[d]||0),
@@ -531,7 +579,10 @@ function renderTrendChart(){
 
 function renderSvcChart(services){
   if(svcChart){svcChart.destroy();svcChart=null;}
-  const entries=Object.entries(services).slice(0,12);
+  // Sort by cost descending rather than trusting key order before slicing —
+  // otherwise the top-12 cutoff can drop genuinely large services in favor
+  // of small ones that merely sort earlier.
+  const entries=Object.entries(services).sort((a,b)=>b[1]-a[1]).slice(0,12);
   if(!entries.length) return;
   // Shorten long service names
   const labels=entries.map(([s])=>s.replace('Amazon ','').replace('AWS ','').replace(' (AWS)',''));
@@ -559,6 +610,39 @@ function renderSvcChart(services){
             title:items=>entries[items[0].dataIndex][0],
             label:c=>` ${fmt(c.parsed.x)}`
           }}
+      },
+      scales:{
+        x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(0)},grid:{color:CHART_DEFAULTS.gridColor}},
+        y:{ticks:{color:CHART_DEFAULTS.tickColor,font:{family:'IBM Plex Mono',size:10}},grid:{display:false}}
+      }
+    }
+  });
+}
+
+function renderProjectChart(projects){
+  if(prjChart){prjChart.destroy();prjChart=null;}
+  const entries=Object.entries(projects||{}).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length) return;
+  const ctx=document.getElementById('prj-chart').getContext('2d');
+  prjChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:entries.map(([p])=>p),
+      datasets:[{
+        data:entries.map(([,c])=>c),
+        backgroundColor:entries.map((_,i)=>PAL[i%PAL.length]+'bb'),
+        borderColor:entries.map((_,i)=>PAL[i%PAL.length]),
+        borderWidth:1,borderRadius:2
+      }]
+    },
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
+          titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
+          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+          callbacks:{label:c=>` ${fmt(c.parsed.x)}`}}
       },
       scales:{
         x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(0)},grid:{color:CHART_DEFAULTS.gridColor}},
@@ -658,7 +742,7 @@ async function loadAudioMoth(){
       '✓ Data from scan at '+fmtDate(data.scanned_at.slice(0,10))+' '+data.scanned_at.slice(11,16)+' UTC · click ↺ RESCAN to refresh');
     if(_authed){
       try{
-        const ac=await get('/ampi/costs',true);
+        const ac=await get('/ampi/costs');
         _ampiCosts=ac.data;
         renderAmpiCostStats();
         renderUnitTable();
@@ -749,7 +833,7 @@ function restoreAmContent(){
 }
 
 async function triggerRescan(){
-  await fetch(API+'/audiomoth/scan',{method:'POST',headers:{'Authorization':'Basic '+_authCreds}});
+  await fetch(API+'/audiomoth/scan',{method:'POST'});
   amLoaded=false; showScanning();
 }
 
@@ -789,8 +873,8 @@ function renderHeatmap(){
   const max=Math.max(...vals,0.001);
   const map={};daily.forEach(d=>{map[d.date]=d;});
   const first=new Date(daily[0].date),last=new Date(daily[daily.length-1].date);
-  // Start on the Monday on or before the first date (Mon=1 in JS, so offset (dow+6)%7)
-  const start=new Date(first);start.setDate(start.getDate()-((start.getDay()+6)%7));
+  // Start on the Sunday on or before the first date — use UTC to match date strings
+  const start=new Date(first);start.setUTCDate(start.getUTCDate()-start.getUTCDay());
 
   const cells=[];
   const cur=new Date(start);
@@ -798,7 +882,7 @@ function renderHeatmap(){
   const monthLabelPositions={};  // month key → pixel offset
 
   while(cur<=last){
-    const dow=(cur.getDay()+6)%7; // Mon=0 … Sun=6
+    const dow=cur.getUTCDay(); // Sun=0 … Sat=6
     if(dow===0){
       // Track first occurrence of each month for the x-label
       const mk=cur.toISOString().slice(0,7);
@@ -811,16 +895,16 @@ function renderHeatmap(){
     const color=isGb?hmColorGb(rawVal,max):hmColorUnits(rawVal,max);
     const inRange=cur>=first&&cur<=last;
     cells.push(`<div class="hm-cell" style="background:${inRange?color:'transparent'}" title="${inRange?(fmtDate(ds)+': '+displayVal):''}"></div>`);
-    cur.setDate(cur.getDate()+1);
+    cur.setUTCDate(cur.getUTCDate()+1);
   }
 
   const heatmapEl=document.getElementById('heatmap');
   if(heatmapEl) heatmapEl.innerHTML=cells.join('');
 
-  // Y-axis: Mon/Wed/Fri labels (16px per row = 14px + 2px gap)
+  // Y-axis: Sun/Tue/Thu/Sat labels (16px per row = 14px + 2px gap)
   const yLabels=document.getElementById('hm-y-labels');
   if(yLabels){
-    const days=['Mon','','Wed','','Fri','',''];
+    const days=['','Mon','','Wed','','Fri',''];
     yLabels.innerHTML=days.map(d=>`<span style="line-height:14px;display:block;height:14px">${d}</span>`).join('');
   }
 
@@ -1149,8 +1233,9 @@ function renderUnitTable(){
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-updateAuthUI();
-loadAudioMoth();
+// Resolve admin status before the first AudioMoth load so its ampi-cost
+// fetch (gated on _authed) doesn't race a still-pending auth check.
+(async()=>{ await checkAuth(); loadAudioMoth(); })();
 </script>
 </body>
 </html>

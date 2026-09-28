@@ -44,6 +44,29 @@ sudo bash deploy/setup.sh
 
 Open `http://<your-ec2-ip>` in a browser. Restrict Security Group port 80 to your IP.
 
+## HTTPS
+
+The site is served by nginx (`deploy/nginx.conf`), so HTTPS is a one-time Certbot run on the EC2 instance — no code changes needed.
+
+1. **DNS**: point your domain (`motusaws.duckdns.org`) at the instance's public IP. DuckDNS updates instantly; confirm with `nslookup motusaws.duckdns.org`.
+2. **Security Group**: open inbound port 443 (in addition to 80 — Certbot needs 80 for the ACME HTTP-01 challenge, and nginx will keep it open to redirect to HTTPS).
+3. **Install Certbot** (already done if you ran `setup.sh` after this change):
+   ```bash
+   sudo apt-get install -y certbot python3-certbot-nginx
+   ```
+4. **Issue the cert and auto-configure nginx**:
+   ```bash
+   sudo certbot --nginx -d motusaws.duckdns.org
+   ```
+   Certbot edits `/etc/nginx/sites-available/aws-cost-dashboard` in place to add a `listen 443 ssl` server block with the cert paths, and (if you accept the prompt) adds an HTTP→HTTPS redirect on port 80. Reload isn't needed — Certbot does it for you.
+5. **Verify**: open `https://motusaws.duckdns.org` — should show a valid padlock. `http://` should redirect to `https://`.
+6. **Auto-renewal**: Certbot installs a systemd timer/cron job automatically. Confirm with:
+   ```bash
+   sudo certbot renew --dry-run
+   ```
+
+`deploy/nginx.conf` in this repo has `server_name` set to `motusaws.duckdns.org` for reference, but the live SSL block only exists in the server's copy after Certbot runs (it isn't reflected back into git automatically — if you want it tracked, copy `/etc/nginx/sites-available/aws-cost-dashboard` back into `deploy/nginx.conf` after issuing the cert).
+
 ## Configuration
 
 Edit `/etc/systemd/system/aws-cost-dashboard.service` to set env vars:
@@ -70,10 +93,14 @@ After editing: `sudo systemctl daemon-reload && sudo systemctl restart aws-cost-
 - Cost Explorer API: $0.01 per request (dashboard makes 4 calls per page load — negligible)
 
 
-## Set password
-```
-sudo sed -i 's/Environment=PROJECT_TAG_KEY=Project/Environment=PROJECT_TAG_KEY=Project\nEnvironment=DASHBOARD_USER=admin\nEnvironment=DASHBOARD_PASS=lWRr31ovl0gyK/' /etc/systemd/system/aws-cost-dashboard.service
-```
+## Access control
+
+Sign-in and authorization are handled centrally, not by this app. oauth2-proxy
+in front of nginx on the shared Motus AWS host does GitHub OAuth and sets
+`X-Auth-Request-Email`; this app then asks the shared User Management service
+(`127.0.0.1:5004`) whether that email has the `admin` role for `aws-costs`.
+Grants are managed in Baserow (Users table, "Tool Access" field,
+`aws-costs:admin`), not in this repo — there's no local password to set.
 
 ## Updating
 

@@ -9,7 +9,7 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "==> Installing system packages"
 apt-get update -q
-apt-get install -y python3 python3-venv nginx
+apt-get install -y python3 python3-venv nginx certbot python3-certbot-nginx
 
 echo "==> Creating app directories"
 mkdir -p "$APP_DIR/backend" "$FRONTEND_DIR"
@@ -44,4 +44,7 @@ echo ""
 echo "Prerequisites:"
 echo "  1. Attach the IAM role with deploy/iam-policy.json to this EC2 instance"
 echo "  2. Tag your AWS resources with 'Project=<name>' (or set PROJECT_TAG_KEY env var)"
-echo "  3. Open port 80 in your Security Group (restrict to your IP for security)"
+echo "  3. Open ports 80 and 443 in your Security Group (restrict to your IP for security)"
+echo ""
+echo "To enable HTTPS (once your domain's DNS points at this instance's IP):"
+echo "  sudo certbot --nginx -d motusaws.duckdns.org"

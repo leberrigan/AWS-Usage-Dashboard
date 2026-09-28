@@ -1,20 +1,26 @@
-import os, json, threading, functools, re
+import os, json, threading, functools, re, time
 from datetime import date, timedelta, datetime
 from collections import defaultdict
 import boto3
+import requests
 from botocore.exceptions import ClientError
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
+# Flask's jsonify() alphabetises dict keys by default, which silently undoes
+# our cost-descending `sorted(...)` calls below (e.g. summary()/services()) —
+# "Top Project" and "Top Services" would end up picking whatever project/
+# service name sorts first alphabetically instead of the highest-cost one.
+app.json.sort_keys = False
 
 TAG_KEY    = os.environ.get("PROJECT_TAG_KEY", "Project")
 AM_BUCKET  = os.environ.get("AUDIOMOTH_BUCKET", "nighthawk-raw-audio")
 REGION     = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 CACHE_FILE = "/tmp/audiomoth_cache.json"
-ADMIN_USER = os.environ.get("DASHBOARD_USER", "admin")
-ADMIN_PASS = os.environ.get("DASHBOARD_PASS", "changeme")
+USER_MGMT_URL = os.environ.get("USER_MGMT_URL", "http://127.0.0.1:5004")
+TOOL_SLUG  = "aws-costs"
 
 def ce(): return boto3.client("ce", region_name="us-east-1")
 def s3(): return boto3.client("s3", region_name=REGION)
@@ -31,28 +37,54 @@ def next_month_start():
 def today_str(): return date.today().strftime("%Y-%m-%d")
 def thirty_days_ago(): return (date.today()-timedelta(days=30)).strftime("%Y-%m-%d")
 
-# ── Basic Auth ────────────────────────────────────────────────────────────────
+# ── Centralized auth ──────────────────────────────────────────────────────────
+# oauth2-proxy sits in front of nginx for the whole host and handles sign-in;
+# by the time a request reaches us, nginx has set X-Auth-Request-Email for a
+# verified identity. What we check ourselves is authorization: is this email
+# allowed to use aws-costs, and with what role. That decision lives in the
+# shared User Management service (Baserow-backed), not in this app.
 
-def check_auth(username, password):
-    return username == ADMIN_USER and password == ADMIN_PASS
+_access_cache = {}   # email -> (expires_at, allowed, role, name)
+_CACHE_TTL = 30       # seconds; matches Asset Management's auth.py
+
+def _check_access(email):
+    now = time.time()
+    cached = _access_cache.get(email)
+    if cached and cached[0] > now:
+        return cached[1], cached[2], cached[3]
+    try:
+        r = requests.get(f"{USER_MGMT_URL}/internal/check",
+                          params={"email": email, "tool": TOOL_SLUG}, timeout=5)
+        r.raise_for_status()
+        data = r.json()
+    except requests.RequestException:
+        # Fail closed, and don't cache the failure — a transient outage of
+        # the user-management service should self-heal on the next request
+        # rather than locking everyone out for the full cache TTL.
+        return False, None, None
+    allowed, role, name = data.get("allowed", False), data.get("role"), data.get("name")
+    _access_cache[email] = (now + _CACHE_TTL, allowed, role, name)
+    return allowed, role, name
 
 def requires_auth(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return Response(
-                'Authentication required', 401,
-                {'WWW-Authenticate': 'Basic realm="Nighthawk Admin"'})
+        email = request.headers.get("X-Auth-Request-Email")
+        if not email:
+            return jsonify({"error": "Not signed in"}), 401
+        allowed, role, _ = _check_access(email)
+        if not allowed or role != "admin":
+            return jsonify({"error": "Not authorized for this tool"}), 403
         return f(*args, **kwargs)
     return decorated
 
 @app.route("/api/auth/check")
 def auth_check():
-    auth = request.authorization
-    if auth and check_auth(auth.username, auth.password):
-        return jsonify({"authenticated": True})
-    return jsonify({"authenticated": False}), 401
+    email = request.headers.get("X-Auth-Request-Email")
+    if not email:
+        return jsonify({"authenticated": False, "name": None})
+    allowed, role, name = _check_access(email)
+    return jsonify({"authenticated": bool(allowed and role == "admin"), "name": name})
 
 # ── FLAC metadata parsing ─────────────────────────────────────────────────────
 
@@ -192,10 +224,15 @@ def _ce_query_all_filtered(end, gran, filter_def):
 @requires_auth
 def summary():
     start,end=period_start(),period_end()
-    r=ce().get_cost_and_usage(TimePeriod={"Start":start,"End":end},Granularity="MONTHLY",
-        Metrics=["UnblendedCost"],GroupBy=[{"Type":"TAG","Key":TAG_KEY},{"Type":"DIMENSION","Key":"SERVICE"}])
+    # Must paginate: GroupBy TAG×SERVICE over 12 months produces a group per
+    # (month, project, service) combo, which for a project touching many
+    # services easily exceeds one page — an un-paginated call here silently
+    # truncates that project's totals (and always the same way, since results
+    # come back in the same order each time), understating it.
+    results=_ce_query_paginated(start,end,"MONTHLY",
+        [{"Type":"TAG","Key":TAG_KEY},{"Type":"DIMENSION","Key":"SERVICE"}])
     projects={}
-    for result in r["ResultsByTime"]:
+    for result in results:
         month=result["TimePeriod"]["Start"][:7]
         for g in result["Groups"]:
             tag=g["Keys"][0].replace(f"{TAG_KEY}$","") or "ampi"
@@ -214,6 +251,7 @@ def summary():
 @requires_auth
 def trend():
     range_param = request.args.get("range", "30d")
+    group_param = request.args.get("group", "project")  # "project" or "service"
     today = date.today()
     if range_param == "7d":
         start = (today - timedelta(days=7)).strftime("%Y-%m-%d"); gran = "DAILY"
@@ -229,27 +267,44 @@ def trend():
         gran = "MONTHLY"
         start = None
     end = today_str() if gran == "DAILY" else period_end()
-    group_by = [{"Type": "TAG", "Key": TAG_KEY}]
+    if group_param == "service":
+        group_by = [{"Type": "DIMENSION", "Key": "SERVICE"}]
+    else:
+        group_by = [{"Type": "TAG", "Key": TAG_KEY}]
     if range_param == "all":
         all_results = _ce_query_all(end, gran, group_by)
     else:
         all_results = _ce_query_paginated(start, end, gran, group_by)
-    series = {}; dates = []
+    totals = defaultdict(lambda: defaultdict(float)); dates = []
     for result in all_results:
         day = result["TimePeriod"]["Start"]; dates.append(day)
         for g in result["Groups"]:
-            tag = g["Keys"][0].replace(f"{TAG_KEY}$", "") or "ampi"
+            if group_param == "service":
+                name = g["Keys"][0]
+            else:
+                # Untagged resources come back as their own group (key "Project$",
+                # empty value) alongside any explicitly-tagged "ampi" group for the
+                # same day — both normalise to "ampi" here, so sum them per day
+                # rather than keeping separate points, or one silently overwrites
+                # the other on the frontend.
+                name = g["Keys"][0].replace(f"{TAG_KEY}$", "") or "ampi"
             cost = float(g["Metrics"]["UnblendedCost"]["Amount"])
-            series.setdefault(tag, []).append({"date": day, "cost": round(cost, 4)})
-    return jsonify({"dates": dates, "series": series, "granularity": gran})
+            totals[name][day] += cost
+    series = {name: [{"date": day, "cost": round(cost, 4)} for day, cost in sorted(by_day.items())]
+              for name, by_day in totals.items()}
+    return jsonify({"dates": dates, "series": series, "granularity": gran, "group": group_param})
 
 @app.route("/api/forecast")
 @requires_auth
 def forecast():
     today=date.today(); ms=today.replace(day=1).strftime("%Y-%m-%d"); ts=today_str()
     me=(today.replace(day=28)+timedelta(days=4)).replace(day=1).strftime("%Y-%m-%d")
-    ar=ce().get_cost_and_usage(TimePeriod={"Start":ms,"End":ts},Granularity="MONTHLY",Metrics=["UnblendedCost"])
-    mtd=float(ar["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"])
+    # CE requires Start < End; on the 1st of the month ms == ts, so MTD is 0
+    if ms < ts:
+        ar=ce().get_cost_and_usage(TimePeriod={"Start":ms,"End":ts},Granularity="MONTHLY",Metrics=["UnblendedCost"])
+        mtd=float(ar["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"])
+    else:
+        mtd=0.0
     try:
         fr=ce().get_cost_forecast(TimePeriod={"Start":ts,"End":me},Metric="UNBLENDED_COST",Granularity="MONTHLY")
         fc=round(float(fr["Total"]["Amount"]),2)
@@ -260,14 +315,27 @@ def forecast():
 @requires_auth
 def services():
     start,end=thirty_days_ago(),today_str()
-    r=ce().get_cost_and_usage(TimePeriod={"Start":start,"End":end},Granularity="MONTHLY",
-        Metrics=["UnblendedCost"],GroupBy=[{"Type":"DIMENSION","Key":"SERVICE"}])
+    results=_ce_query_paginated(start,end,"MONTHLY",[{"Type":"DIMENSION","Key":"SERVICE"}])
     svcs={}
-    for result in r["ResultsByTime"]:
+    for result in results:
         for g in result["Groups"]:
             svc=g["Keys"][0]; cost=float(g["Metrics"]["UnblendedCost"]["Amount"])
             if cost>=0.01: svcs[svc]=svcs.get(svc,0.0)+cost
     return jsonify({"services":dict(sorted(svcs.items(),key=lambda x:x[1],reverse=True))})
+
+@app.route("/api/projects")
+@requires_auth
+def projects():
+    start, end = thirty_days_ago(), today_str()
+    results = _ce_query_paginated(start, end, "MONTHLY", [{"Type": "TAG", "Key": TAG_KEY}])
+    projs = {}
+    for result in results:
+        for g in result["Groups"]:
+            tag = g["Keys"][0].replace(f"{TAG_KEY}$", "") or "ampi"
+            cost = float(g["Metrics"]["UnblendedCost"]["Amount"])
+            if cost >= 0.01:
+                projs[tag] = projs.get(tag, 0.0) + cost
+    return jsonify({"projects": dict(sorted(projs.items(), key=lambda x: x[1], reverse=True))})
 
 @app.route("/api/ampi/costs")
 @requires_auth
@@ -303,24 +371,36 @@ def ampi_costs():
     d3m = (today - timedelta(days=91)).strftime("%Y-%m")
     three_month_cost = sum(v for k, v in monthly_costs.items() if k >= d3m)
 
+    # Active-unit counts: cache["monthly"][].active_units is a union of every
+    # unit that uploaded *at all* during that month, which saturates near the
+    # full fleet size for any completed month and looks constant month-to-month.
+    # Use the true per-day active-unit counts instead (same source the
+    # "AudioMoth units" overlay on the project/service trend uses), taking the
+    # day's own count for the daily series and the average across the month's
+    # days for the monthly series.
     cache = load_cache()
-    monthly_stations = {m["month"]: m["active_units"] for m in cache.get("monthly", [])} if cache else {}
+    daily_active_units = {d["date"]: d["active_units"]
+                           for d in cache.get("overview", {}).get("daily_series", [])} if cache else {}
+
+    def avg_active_units(month_key):
+        vals = [v for d, v in daily_active_units.items() if d.startswith(month_key)]
+        return round(sum(vals) / len(vals)) if vals else 0
 
     daily_series = []
     for result in daily_results:
         day = result["TimePeriod"]["Start"]
         cost = float(result["Total"]["UnblendedCost"]["Amount"])
-        stations = monthly_stations.get(day[:7], 0)
+        stations = daily_active_units.get(day, 0)
         cps = round(cost / stations, 6) if stations > 0 else None
         daily_series.append({"date": day, "cost": round(cost, 4),
                               "active_stations": stations, "cost_per_station": cps})
 
-    monthly_series = [
-        {"month": k, "cost": round(v, 4),
-         "active_stations": monthly_stations.get(k, 0),
-         "cost_per_station": round(v / monthly_stations[k], 4) if monthly_stations.get(k, 0) > 0 else None}
-        for k, v in sorted(monthly_costs.items())
-    ]
+    monthly_series = []
+    for k, v in sorted(monthly_costs.items()):
+        stations = avg_active_units(k)
+        monthly_series.append({"month": k, "cost": round(v, 4),
+                                "active_stations": stations,
+                                "cost_per_station": round(v / stations, 4) if stations > 0 else None})
     return jsonify({
         "total_cost": round(total_cost, 2),
         "three_month_cost": round(three_month_cost, 2),
@@ -351,7 +431,7 @@ def run_scan():
         daily_active = defaultdict(set); daily_volume = defaultdict(int)
         unit_data = []; cutoff = (date.today()-timedelta(days=7)).strftime("%Y-%m-%d")
         for unit in units:
-            dates = set(); size_by_date = {}; sample_key = None; sample_date = ""
+            dates = set(); size_by_date = {}; gps_candidates = []  # (date, key) recent FLACs
             yr = client.list_objects_v2(Bucket=AM_BUCKET, Prefix=f"{unit}/", Delimiter="/")
             for yp in yr.get("CommonPrefixes",[]):
                 year = yp["Prefix"].rstrip("/").split("/")[-1]
@@ -370,11 +450,13 @@ def run_scan():
                             count = len(contents)
                             sz = sum(o["Size"] for o in contents)
                             size_by_date[ds] = {"count": count, "bytes": sz}
-                            # Track most recent FLAC key for GPS extraction
-                            if ds > sample_date:
-                                for obj in contents:
-                                    if obj["Key"].upper().endswith(".FLAC"):
-                                        sample_key = obj["Key"]; sample_date = ds; break
+                            # Collect recent FLAC candidates (keep 5 newest dates)
+                            for obj in contents:
+                                if obj["Key"].upper().endswith(".FLAC"):
+                                    gps_candidates.append((ds, obj["Key"]))
+                                    gps_candidates.sort(key=lambda x: x[0], reverse=True)
+                                    gps_candidates = gps_candidates[:5]
+                                    break
                         except ValueError: pass
             if not dates: continue
             monthly = defaultdict(lambda: {"count":0,"bytes":0})
@@ -387,10 +469,12 @@ def run_scan():
                 monthly[mk]["count"] += info["count"]; monthly[mk]["bytes"] += info["bytes"]
                 tf += info["count"]; tb += info["bytes"]
                 daily_active[ds].add(unit); daily_volume[ds] += info["bytes"]
-            # Extract GPS + unit serial numbers from the most recent FLAC sample
+            # Try recent FLACs newest-first until GPS coordinates are found
             lat = lon = am_serno = pi_serno = None
-            if sample_key:
-                lat, lon, am_serno, pi_serno = get_unit_metadata(client, sample_key)
+            for _, ckey in gps_candidates:
+                lat, lon, am_serno, pi_serno = get_unit_metadata(client, ckey)
+                if lat is not None and lon is not None:
+                    break
             unit_data.append({
                 "unit": unit, "first_seen": min(dates), "last_seen": max(dates),
                 "total_files": tf, "total_bytes": tb, "active_days": len(dates),
@@ -490,6 +574,14 @@ def audiomoth_monthly():
 
 @app.route("/health")
 def health(): return jsonify({"status":"ok"})
+
+def _auto_rescan_loop():
+    import time
+    while True:
+        time.sleep(3600)
+        run_scan()
+
+threading.Thread(target=_auto_rescan_loop, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
