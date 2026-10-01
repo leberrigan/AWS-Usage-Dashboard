@@ -4,148 +4,143 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Motus AWS · Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/motus-tools.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
-:root{
-  --bg:#080c10;--bg2:#0c1118;--bg3:#111820;--bg4:#161f2a;--border:#1a2535;
-  --text:#c8ddf0;--muted:#6a8aa8;--accent:#00d4ff;--green:#3dffa0;
-  --amber:#ffb830;--red:#ff4d6d;--purple:#b57aff;
-  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
-}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;min-height:100vh;}
-header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:200;}
-.brand{display:flex;align-items:center;gap:14px;}
-.brand svg{width:28px;height:28px;flex-shrink:0;}
-.brand-name{font-family:var(--mono);font-size:14px;font-weight:600;color:#fff;letter-spacing:0.1em;}
-.brand-name em{color:var(--green);font-style:normal;}
-.header-right{display:flex;align-items:center;gap:14px;}
-.period-tag{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);padding:3px 10px;border-radius:2px;}
-.refresh-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:4px 12px;cursor:pointer;border-radius:2px;transition:all 0.2s;letter-spacing:0.06em;}
-.refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
-.auth-badge{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:2px;border:1px solid;}
-.auth-badge.in{color:var(--green);border-color:var(--green);}
-.auth-badge.out{color:var(--muted);border-color:var(--border);}
-.tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 28px;}
-.tab-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:0.08em;padding:12px 20px;cursor:pointer;transition:all 0.2s;margin-bottom:-1px;text-transform:uppercase;}
-.tab-btn:hover{color:var(--text);}
-.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
-.tab-btn.locked{opacity:0.35;cursor:default;}
+/* Local additions on top of /shared/motus-tools.css — no colors, fonts or
+   spacing are invented here; everything below reads var(--motus-*) tokens. */
+*{box-sizing:border-box;}
+body{font-size:15px;}
+.motus-header{position:sticky;top:0;z-index:200;}
+/* Tab switcher lives in .tool-sidebar as buttons (see HEADER_MIGRATION.md's
+   "Tabs and side-navs") — .tool-sidebar .nav-link supplies the base look;
+   this just resets native <button> chrome and keeps the existing
+   .tab-btn.active/.locked state hooks the JS already toggles. */
+.tool-sidebar .tab-btn{background:none;border:none;font-family:inherit;cursor:pointer;width:100%;text-align:left;}
+.tab-btn.locked{opacity:0.4;cursor:default;}
 .tab-pane{display:none;}
 .tab-pane.active{display:block;}
-main{padding:24px 28px;max-width:1440px;margin:0 auto;}
-.error-bar{display:none;background:#140608;border:1px solid var(--red);color:#ff8fa3;font-family:var(--mono);font-size:12px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
-.info-bar{display:none;background:#0a1a10;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:12px;padding:10px 16px;border-radius:3px;margin-bottom:20px;}
-.stats-row,.am-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
-.stat{background:var(--bg2);border:1px solid var(--border);padding:18px 20px;border-radius:3px;position:relative;overflow:hidden;}
-.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;opacity:.6;}
-.stat.c::after{background:var(--accent);}
-.stat.g::after{background:var(--green);}
-.stat.a::after{background:var(--amber);}
-.stat.p::after{background:var(--purple);}
-.stat-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;}
-.stat-val{font-family:var(--mono);font-size:28px;font-weight:600;color:#fff;line-height:1;}
-.stat-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px;}
-.panel{background:var(--bg2);border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-bottom:20px;}
-.panel-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--bg3);flex-wrap:wrap;gap:8px;}
-.panel-title{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text);}
-.panel-body{padding:18px;}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px;}
+.tool-sidebar-extra{border-top:1px solid var(--motus-border);margin-top:var(--motus-space-2);padding:var(--motus-space-2) var(--motus-space-2) 0;display:flex;flex-direction:column;gap:var(--motus-space-1);}
+.tool-sidebar-extra .tab-btn{padding:0.55rem 0.9rem;border-radius:var(--motus-radius-lg);font-size:0.8125rem;font-weight:600;color:var(--motus-muted);}
+.tool-sidebar-extra .tab-btn:hover{color:var(--motus-link-hover);background:var(--motus-light);}
+.tool-content{padding:var(--motus-space-4) var(--motus-space-4);max-width:1440px;margin:0 auto;}
+.error-bar{display:none;font-size:0.8125rem;}
+.info-bar{display:none;font-size:0.8125rem;}
+.stats-row,.am-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--motus-space-2);margin-bottom:var(--motus-space-3);}
+.stat{background:var(--motus-white);border-radius:var(--motus-radius-lg);box-shadow:var(--motus-shadow);padding:var(--motus-space-2) var(--motus-space-3);position:relative;overflow:hidden;}
+.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;}
+.stat.c::after{background:var(--motus-secondary);}
+.stat.g::after{background:var(--motus-primary);}
+.stat.a::after{background:var(--motus-warning);}
+.stat.p::after{background:var(--motus-info);}
+.stat-label{font-size:0.6875rem;color:var(--motus-muted);letter-spacing:0.06em;text-transform:uppercase;font-weight:700;margin-bottom:0.5rem;}
+.stat-val{font-size:1.75rem;font-weight:700;color:var(--motus-dark);line-height:1;}
+.stat-sub{font-size:0.75rem;color:var(--motus-muted);margin-top:0.4rem;}
+.panel{background:var(--motus-white);border-radius:var(--motus-radius-lg);box-shadow:var(--motus-shadow);overflow:hidden;margin-bottom:var(--motus-space-3);}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:var(--motus-space-2) var(--motus-space-3);border-bottom:1px solid var(--motus-border);flex-wrap:wrap;gap:var(--motus-space-1);}
+.panel-title{font-size:0.8125rem;font-weight:700;color:var(--motus-dark);}
+.panel-body{padding:var(--motus-space-3);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--motus-space-3);margin-bottom:var(--motus-space-3);}
 .stacked-chart-wrap{position:relative;height:260px;}
 .range-btns{display:flex;gap:4px;}
-.range-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:3px 10px;cursor:pointer;border-radius:2px;letter-spacing:.06em;transition:all .15s;}
-.range-btn:hover{border-color:var(--text);color:var(--text);}
-.range-btn.active{border-color:var(--accent);color:var(--accent);}
+.range-btn.active{background:var(--motus-primary);border-color:var(--motus-primary);color:var(--motus-white);}
 .chart-wrap{position:relative;height:220px;}
 .svc-chart-wrap{position:relative;height:300px;}
 .hm-toggle{display:flex;gap:4px;}
-.hm-toggle-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:3px 10px;cursor:pointer;border-radius:2px;letter-spacing:.06em;transition:all .15s;}
-.hm-toggle-btn:hover{border-color:var(--text);color:var(--text);}
-.hm-toggle-btn.active{border-color:var(--green);color:var(--green);}
+.hm-toggle-btn.active{background:var(--motus-primary);border-color:var(--motus-primary);color:var(--motus-white);}
 /* GitHub-style heatmap */
 .hm-outer{overflow-x:auto;padding-bottom:4px;}
 .hm-container{display:flex;gap:6px;width:max-content;}
-.hm-y-labels{display:grid;grid-template-rows:repeat(7,14px);gap:2px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;padding-right:6px;margin-top:22px;line-height:14px;}
+.hm-y-labels{display:grid;grid-template-rows:repeat(7,14px);gap:2px;font-size:0.625rem;color:var(--motus-muted);text-align:right;padding-right:6px;margin-top:22px;line-height:14px;}
 .hm-right{display:flex;flex-direction:column;gap:4px;}
-.hm-x-labels{position:relative;height:20px;font-family:var(--mono);font-size:10px;color:var(--muted);}
+.hm-x-labels{position:relative;height:20px;font-size:0.625rem;color:var(--motus-muted);}
 .hm-x-label{position:absolute;white-space:nowrap;}
 .heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,14px);gap:2px;width:max-content;}
-.hm-cell{width:14px;height:14px;border-radius:2px;background:var(--bg4);cursor:default;}
-.hm-cell:hover{outline:1px solid var(--accent);}
-.hm-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--muted);flex-wrap:wrap;}
-.hm-swatch{width:11px;height:11px;border-radius:1px;flex-shrink:0;}
-.unit-table,.mo-table{width:100%;border-collapse:collapse;}
-.unit-table th,.mo-table th{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap;}
+.hm-cell{width:14px;height:14px;border-radius:2px;background:var(--motus-light);cursor:default;}
+.hm-cell:hover{outline:1px solid var(--motus-secondary);}
+.hm-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:0.625rem;color:var(--motus-muted);flex-wrap:wrap;}
+.hm-swatch{width:11px;height:11px;border-radius:1px;flex-shrink:0;border:1px solid var(--motus-border);}
 .unit-table th.sortable{cursor:pointer;user-select:none;}
-.unit-table th.sortable:hover{color:var(--text);}
-.unit-table th.sort-asc::after{content:' ▲';font-size:9px;}
-.unit-table th.sort-desc::after{content:' ▼';font-size:9px;}
-.unit-table td,.mo-table td{font-family:var(--mono);font-size:12px;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
-.unit-table tr:last-child td,.mo-table tr:last-child td{border-bottom:none;}
-.unit-table tr:hover td{background:var(--bg3);cursor:pointer;}
-.unit-table tr.selected td{background:#111c14;cursor:pointer;}
-.mo-table tr:hover td{background:var(--bg3);}
+.unit-table th.sortable:hover{color:var(--motus-primary);}
+.unit-table th.sort-asc::after{content:' \25B2';font-size:9px;}
+.unit-table th.sort-desc::after{content:' \25BC';font-size:9px;}
+.unit-table tbody tr{cursor:pointer;}
+.unit-table tr.selected td{background:var(--motus-primary-tint);}
 .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle;}
-.status-dot.active{background:var(--green);box-shadow:0 0 6px var(--green);}
-.status-dot.inactive{background:var(--muted);}
+.status-dot.active{background:var(--motus-success);box-shadow:0 0 4px var(--motus-success);}
+.status-dot.inactive{background:var(--motus-muted);}
 .mini-bar-wrap{display:flex;align-items:center;gap:8px;}
-.mini-bar-bg{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;min-width:60px;}
-.mini-bar-fill{height:100%;border-radius:2px;background:var(--purple);}
+.mini-bar-bg{flex:1;height:4px;background:var(--motus-light);border-radius:2px;overflow:hidden;min-width:60px;}
+.mini-bar-fill{height:100%;border-radius:2px;background:var(--motus-secondary);}
 .scanning-state{padding:48px;text-align:center;}
-.scanning-spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;}
+.scanning-spinner{width:32px;height:32px;border:3px solid var(--motus-border);border-top-color:var(--motus-primary);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto var(--motus-space-2);}
 @keyframes spin{to{transform:rotate(360deg)}}
-.scanning-title{font-family:var(--mono);font-size:14px;color:var(--green);margin-bottom:8px;}
-.scanning-sub{font-family:var(--mono);font-size:11px;color:var(--muted);}
-.rescan-btn{background:none;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:11px;padding:6px 16px;cursor:pointer;border-radius:2px;transition:all 0.2s;}
-.rescan-btn:hover{background:var(--green);color:var(--bg);}
-.rescan-btn.locked{border-color:var(--border);color:var(--muted);cursor:default;}
-.rescan-btn.locked:hover{background:none;color:var(--muted);}
-.skel{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg2) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.3s infinite;border-radius:3px;}
+.scanning-title{font-size:1rem;font-weight:700;color:var(--motus-dark);margin-bottom:0.5rem;}
+.scanning-sub{font-size:0.8125rem;color:var(--motus-muted);}
+.rescan-btn.locked{opacity:0.5;cursor:default;}
+.skel{background:linear-gradient(90deg,var(--motus-light) 25%,var(--motus-border) 50%,var(--motus-light) 75%);background-size:200% 100%;animation:shimmer 1.3s infinite;border-radius:var(--motus-radius);}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .fade{animation:fadeUp 0.35s ease both;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 /* Leaflet map */
-#am-map{height:420px;border-radius:0;background:var(--bg3);}
-.leaflet-container{background:#0a1018;}
+#am-map{height:420px;border-radius:var(--motus-radius);background:var(--motus-light);}
 /* Unit detail panel */
-.unit-detail-panel{display:none;border-top:1px solid var(--border);padding:18px;}
-.unit-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-.unit-detail-title{font-family:var(--mono);font-size:13px;color:#fff;}
-.unit-detail-close{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;padding:3px 10px;cursor:pointer;border-radius:2px;letter-spacing:.06em;transition:all .15s;}
-.unit-detail-close:hover{border-color:var(--text);color:var(--text);}
+.unit-detail-panel{display:none;border-top:1px solid var(--motus-border);padding:var(--motus-space-3);}
+.unit-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--motus-space-2);}
+.unit-detail-title{font-size:0.9375rem;font-weight:700;color:var(--motus-dark);}
 .detail-chart-wrap{position:relative;height:180px;}
 @media(max-width:860px){.stats-row,.am-stats{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
 
-<header>
-  <div class="brand">
-    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="14" cy="14" r="13" stroke="#1a2535" stroke-width="1.5"/>
-      <path d="M7 19 Q14 6 21 19" stroke="#3dffa0" stroke-width="1.5" fill="none"/>
-      <circle cx="14" cy="14" r="2" fill="#3dffa0"/>
-    </svg>
-    <span class="brand-name">Motus <em>/</em> AWS</span>
-  </div>
-  <div class="header-right">
-    <div class="auth-badge out" id="auth-badge"></div>
-    <button class="refresh-btn" onclick="reloadActive()">↺ REFRESH</button>
-  </div>
+<header class="motus-header">
+  <nav class="navbar">
+    <a class="navbar-brand" href="https://motus.org" target="_blank" rel="noopener">
+      <img class="navbar-brand-logo" src="/shared/img/motus-logo-horizontal.png" alt="Motus">
+    </a>
+    <ul class="nav">
+      <li class="nav-item"><a class="nav-link navbar-tools-link" href="/">Tools</a></li>
+      <li class="nav-item navbar-crumb">AWS Costs Dashboard</li>
+    </ul>
+  </nav>
+  <nav class="navbar navbar-account">
+    <ul class="nav">
+      <li class="nav-item" id="motus-signin-item">
+        <a class="navbar-signin-link" href="/oauth2/sign_in?rd=/">Sign in</a>
+      </li>
+      <li class="nav-item dropdown" id="motus-account-item" style="display:none">
+        <a class="nav-link dropdown-toggle" href="#" id="motus-account-toggle"></a>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="/oauth2/sign_out?rd=/">Sign out</a></li>
+        </ul>
+      </li>
+    </ul>
+    <img class="navbar-logo-birds-canada" src="/shared/img/birds-canada-logo-horizontal.png" alt="Birds Canada">
+  </nav>
 </header>
 
-<div class="tab-bar">
-  <button class="tab-btn locked" id="tab-btn-costs" onclick="clickCostsTab(this)"><span style="margin-right:7px">$</span>AWS COSTS</button>
-  <button class="tab-btn active" id="tab-btn-audiomoth" onclick="switchTab('audiomoth',this)"><span style="margin-right:7px">◉</span>AUDIOMOTH UNITS</button>
-</div>
+<div class="tool-body">
+  <nav class="tool-sidebar">
+    <ul class="nav">
+      <li class="nav-item"><button class="nav-link tab-btn locked" id="tab-btn-costs" onclick="clickCostsTab(this)"><span style="margin-right:7px">$</span>AWS Costs</button></li>
+      <li class="nav-item"><button class="nav-link tab-btn active" id="tab-btn-audiomoth" onclick="switchTab('audiomoth',this)"><span style="margin-right:7px">&#9673;</span>AudioMoth Units</button></li>
+    </ul>
+    <div class="tool-sidebar-extra">
+      <button class="nav-link tab-btn" onclick="reloadActive()">&#8635; Refresh</button>
+      <span class="badge" id="auth-badge"></span>
+    </div>
+  </nav>
+  <main class="tool-content">
 
 <!-- COSTS TAB -->
 <div class="tab-pane" id="tab-costs">
-<main>
-  <div class="error-bar" id="cost-error"></div>
+  <div class="alert alert-danger error-bar" id="cost-error"></div>
   <div class="stats-row" id="cost-stats">
     <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
     <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
@@ -153,7 +148,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
   <div class="panel">
     <div class="panel-head">
       <span class="panel-title">Projects · Stacked Monthly Cost</span>
-      <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">Each colour = one project</span>
+      <span class="text-muted" style="font-size:0.75rem">Each colour = one project</span>
     </div>
     <div class="panel-body"><div class="stacked-chart-wrap"><canvas id="stacked-chart"></canvas></div></div>
   </div>
@@ -161,16 +156,16 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     <div class="panel-head">
       <span class="panel-title">Spend Trend</span>
       <div class="range-btns" id="trend-group-btns">
-        <button class="range-btn active" onclick="setGroup('project',this)">PROJECT</button>
-        <button class="range-btn" onclick="setGroup('service',this)">SERVICE</button>
-        <button class="range-btn" onclick="setGroup('audio',this)">AUDIO</button>
+        <button class="btn btn-light btn-sm range-btn active" onclick="setGroup('project',this)">Project</button>
+        <button class="btn btn-light btn-sm range-btn" onclick="setGroup('service',this)">Service</button>
+        <button class="btn btn-light btn-sm range-btn" onclick="setGroup('audio',this)">Audio</button>
       </div>
       <div class="range-btns">
-        <button class="range-btn" onclick="setRange('7d',this)">7D</button>
-        <button class="range-btn active" onclick="setRange('30d',this)">30D</button>
-        <button class="range-btn" onclick="setRange('3m',this)">3M</button>
-        <button class="range-btn" onclick="setRange('1y',this)">1Y</button>
-        <button class="range-btn" onclick="setRange('all',this)">ALL</button>
+        <button class="btn btn-light btn-sm range-btn" onclick="setRange('7d',this)">7D</button>
+        <button class="btn btn-light btn-sm range-btn active" onclick="setRange('30d',this)">30D</button>
+        <button class="btn btn-light btn-sm range-btn" onclick="setRange('3m',this)">3M</button>
+        <button class="btn btn-light btn-sm range-btn" onclick="setRange('1y',this)">1Y</button>
+        <button class="btn btn-light btn-sm range-btn" onclick="setRange('all',this)">All</button>
       </div>
     </div>
     <div class="panel-body"><div class="chart-wrap"><canvas id="trend-chart"></canvas></div></div>
@@ -189,14 +184,19 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     <div class="panel-head"><span class="panel-title">Monthly Cost per Active Station</span></div>
     <div class="panel-body"><div class="chart-wrap"><canvas id="cps-chart"></canvas></div></div>
   </div>
-</main>
+  <div class="panel" id="cost-projection-panel" style="display:none">
+    <div class="panel-head"><span class="panel-title">Cost per Station vs Fleet Size</span></div>
+    <div class="panel-body">
+      <div class="chart-wrap"><canvas id="cost-projection-chart"></canvas></div>
+      <div class="text-muted" style="font-size:0.7rem;padding:8px 2px 0">Rough estimate: a straight-line fit of monthly cost vs. average active stations over the available history, split into a fixed (shared) part and a per-station part. Extrapolated past the observed fleet size — treat as directional, not exact.</div>
+    </div>
+  </div>
 </div>
 
 <!-- AUDIOMOTH TAB -->
 <div class="tab-pane active" id="tab-audiomoth">
-<main>
-  <div class="error-bar" id="am-error"></div>
-  <div class="info-bar" id="am-info"></div>
+  <div class="alert alert-danger error-bar" id="am-error"></div>
+  <div class="alert alert-info info-bar" id="am-info"></div>
   <div id="am-content">
     <div class="am-stats" id="am-stats">
       <div class="stat skel" style="height:88px"></div><div class="stat skel" style="height:88px"></div>
@@ -207,8 +207,8 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
       <div class="panel-head">
         <span class="panel-title" id="hm-title">Active Units Per Day</span>
         <div class="hm-toggle">
-          <button class="hm-toggle-btn active" onclick="setHmMode('units',this)">Units</button>
-          <button class="hm-toggle-btn" onclick="setHmMode('gb',this)">GB / day</button>
+          <button class="btn btn-light btn-sm hm-toggle-btn active" onclick="setHmMode('units',this)">Units</button>
+          <button class="btn btn-light btn-sm hm-toggle-btn" onclick="setHmMode('gb',this)">GB / day</button>
         </div>
       </div>
       <div class="panel-body">
@@ -226,13 +226,13 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     </div>
     <div class="panel">
       <div class="panel-head"><span class="panel-title">Station Locations</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="map-status-label"></span>
+        <span class="text-muted" style="font-size:0.75rem" id="map-status-label"></span>
       </div>
       <div id="am-map"></div>
       <div class="unit-detail-panel" id="unit-detail-panel">
         <div class="unit-detail-header">
           <span class="unit-detail-title" id="unit-detail-title">—</span>
-          <button class="unit-detail-close" onclick="closeUnitDetail()">Clear</button>
+          <button class="btn btn-light btn-sm" onclick="closeUnitDetail()">Clear</button>
         </div>
         <div class="detail-chart-wrap"><canvas id="detail-chart"></canvas></div>
       </div>
@@ -240,7 +240,7 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     <div class="grid2">
       <div class="panel"><div class="panel-head"><span class="panel-title">Monthly Summary</span></div>
         <div class="panel-body" style="padding:0">
-          <table class="mo-table"><thead><tr><th>Month</th><th>Units Active</th><th>Recordings</th><th>Data</th></tr></thead>
+          <table class="table table-striped table-hover mo-table"><thead><tr><th>Month</th><th>Units Active</th><th>Recordings</th><th>Data</th></tr></thead>
           <tbody id="mo-tbody"></tbody></table>
         </div>
       </div>
@@ -251,14 +251,14 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
     <div class="panel">
       <div class="panel-head">
         <span class="panel-title">Unit Registry</span>
-        <div style="display:flex;align-items:center;gap:12px">
-          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="unit-count-label"></span>
-          <button class="range-btn" onclick="downloadUnitsJson()" title="Download units as JSON">↓ JSON</button>
-          <button class="rescan-btn locked" id="rescan-btn" onclick="tryRescan()">↺ RESCAN</button>
+        <div class="d-flex align-center gap-2">
+          <span class="text-muted" style="font-size:0.75rem" id="unit-count-label"></span>
+          <button class="btn btn-light btn-sm" onclick="downloadUnitsJson()" title="Download units as JSON">&#8595; JSON</button>
+          <button class="btn btn-light btn-sm rescan-btn locked" id="rescan-btn" onclick="tryRescan()">&#8635; Rescan</button>
         </div>
       </div>
       <div style="overflow-x:auto">
-        <table class="unit-table" id="unit-table">
+        <table class="table table-hover unit-table" id="unit-table">
           <thead><tr>
             <th class="sortable" onclick="sortTable('unit')">Unit</th>
             <th class="sortable" onclick="sortTable('status')">Status</th>
@@ -274,7 +274,8 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
       </div>
     </div>
   </div>
-</main>
+</div>
+  </main>
 </div>
 
 <script>
@@ -282,10 +283,18 @@ main{padding:24px 28px;max-width:1440px;margin:0 auto;}
 // calls must be prefixed to match nginx's /aws-costs/api/ proxy location.
 window.API_BASE=window.API_BASE||'/aws-costs';
 const API=(window.API_BASE||'')+'/api';
-const PAL=['#00d4ff','#3dffa0','#ffb830','#ff4d6d','#b57aff','#ff6b35','#06d6a0','#f4a261','#a8dadc','#e9c46a'];
+// Categorical chart palette — a separate, dataviz-skill-validated instance,
+// not brand hex reuse. Slots 1/6/8 are brand-sympathetic (a lightened
+// --motus-secondary, --motus-primary, --motus-danger); the rest fill out
+// the 8-hue fixed order the brand's 2-hue system doesn't provide. Validated
+// via validate_palette.js: all 8 pass lightness/chroma/CVD; 3 slots WARN on
+// contrast, mitigated by the legends/tooltips already present on every chart.
+const PAL=['#1a6cad','#eb6834','#1baf7a','#eda100','#e87ba4','#548325','#4a3aa7','#da4632'];
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-let trendChart=null,volumeChart=null,stackedChart=null,svcChart=null,prjChart=null,cpsChart=null,detailChart=null;
+function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+
+let trendChart=null,volumeChart=null,stackedChart=null,svcChart=null,prjChart=null,cpsChart=null,detailChart=null,costProjChart=null;
 let amLoaded=false,costsLoaded=false,scanPollTimer=null;
 let _summaryData=null,_trendData=null,_amOverview=null,_monthlyData=null;
 let _unitData=[],_sortCol='last_seen',_sortDir='desc';
@@ -323,11 +332,11 @@ function updateAuthUI(name){
   const costsBtn=document.getElementById('tab-btn-costs');
   const rescanBtn=document.getElementById('rescan-btn');
   if(_authed){
-    badge.textContent=name?('ADMIN · '+name):'ADMIN'; badge.className='auth-badge in';
+    badge.textContent=name?('Admin · '+name):'Admin'; badge.className='badge badge-success';
     costsBtn.classList.remove('locked');
     if(rescanBtn) rescanBtn.classList.remove('locked');
   } else {
-    badge.textContent='VIEW ONLY'; badge.className='auth-badge out';
+    badge.textContent='View only'; badge.className='badge badge-warning';
     costsBtn.classList.add('locked');
     if(rescanBtn) rescanBtn.classList.add('locked');
   }
@@ -372,11 +381,23 @@ function showErr(id,msg){const el=document.getElementById(id);el.style.display='
 function showInfo(id,msg){const el=document.getElementById(id);el.style.display='block';el.textContent=msg;}
 function hideInfo(id){document.getElementById(id).style.display='none';}
 
+// Chart colors resolve Motus CSS custom properties at runtime (canvas can't
+// read var() itself) rather than hardcoding brand hex here. Falls back to
+// browser default (black) if /shared/motus-tools.css hasn't loaded — the
+// accepted local-dev degradation per STYLE_GUIDE.md.
+const FONT_FAMILY=cssVar('--motus-font')||'Overpass, sans-serif';
 const CHART_DEFAULTS={
-  titleColor:'#c8ddf0',bodyColor:'#6a8aa8',
-  titleFont:{family:'IBM Plex Mono',size:11},bodyFont:{family:'IBM Plex Mono',size:11},
-  tickColor:'#4a6a8a',tickFont:{family:'IBM Plex Mono',size:10},gridColor:'#111820',
-  legendColor:'#6a8aa8',legendFont:{family:'IBM Plex Mono',size:10}
+  titleColor:cssVar('--motus-dark'),bodyColor:cssVar('--motus-muted'),
+  titleFont:{family:FONT_FAMILY,size:11,weight:'700'},bodyFont:{family:FONT_FAMILY,size:11},
+  tickColor:cssVar('--motus-muted'),tickFont:{family:FONT_FAMILY,size:10},gridColor:cssVar('--motus-border'),
+  legendColor:cssVar('--motus-muted'),legendFont:{family:FONT_FAMILY,size:10}
+};
+// Shared tooltip look (dark chip, readable on the light theme) — spread into
+// every chart's `plugins.tooltip` instead of repeating the same five keys.
+const TT={
+  backgroundColor:cssVar('--motus-dark'),borderWidth:0,cornerRadius:4,padding:10,
+  titleColor:cssVar('--motus-white'),bodyColor:cssVar('--motus-light'),
+  titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont
 };
 
 // ════════════════════════════════════════════
@@ -431,9 +452,7 @@ function renderStackedChart(projects){
       interaction:{mode:'index',intersect:false},
       plugins:{
         legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
-        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-          titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+        tooltip:{...TT,
           callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y)}`,
             footer:items=>'  Total: '+fmt(items.reduce((s,i)=>s+i.parsed.y,0))}}
       },
@@ -500,7 +519,7 @@ function renderAudioTrendChart(ctx){
   const labels=rows.map(r=>gran==='MONTHLY'?fmtMonth(r.month):fmtDate(r.date));
   const datasets=[
     {label:'Active units',data:rows.map(r=>r.active_stations||0),
-      borderColor:'#ffffff88',borderWidth:1.5,borderDash:[4,3],pointRadius:0,tension:0.3,fill:false,yAxisID:'y2'},
+      borderColor:cssVar('--motus-muted'),borderWidth:1.5,borderDash:[4,3],pointRadius:0,tension:0.3,fill:false,yAxisID:'y2'},
     {label:'Cost per unit (ampi)',data:rows.map(r=>r.cost_per_station!=null?+r.cost_per_station.toFixed(2):null),
       borderColor:PAL[0],borderWidth:1.5,pointRadius:0,tension:0.3,fill:false,yAxisID:'y',spanGaps:true}
   ];
@@ -509,15 +528,13 @@ function renderAudioTrendChart(ctx){
     interaction:{mode:'index',intersect:false},
     plugins:{
       legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
-      tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-        titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-        titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+      tooltip:{...TT,
         callbacks:{label:c=>c.dataset.yAxisID==='y2'?` ${c.dataset.label}: ${c.parsed.y} units`:` ${c.dataset.label}: ${c.parsed.y==null?'—':'$'+c.parsed.y.toFixed(2)}`}}
     },
     scales:{
       x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:12},grid:{color:CHART_DEFAULTS.gridColor}},
       y:{position:'left',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(2)},grid:{color:CHART_DEFAULTS.gridColor}},
-      y2:{display:true,position:'right',ticks:{color:'#7a9ab0',font:CHART_DEFAULTS.tickFont,callback:v=>v+' u'},grid:{drawOnChartArea:false}}
+      y2:{display:true,position:'right',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>v+' u'},grid:{drawOnChartArea:false}}
     }
   }});
 }
@@ -553,7 +570,7 @@ function renderTrendChart(){
         }
         return amMap[d]||0;
       }),
-      borderColor:'#ffffff88',borderWidth:1.5,borderDash:[4,3],
+      borderColor:cssVar('--motus-muted'),borderWidth:1.5,borderDash:[4,3],
       pointRadius:0,tension:0.3,fill:false,yAxisID:'y2'
     });
   }
@@ -564,15 +581,13 @@ function renderTrendChart(){
     interaction:{mode:'index',intersect:false},
     plugins:{
       legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
-      tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-        titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-        titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+      tooltip:{...TT,
         callbacks:{label:c=>c.dataset.yAxisID==='y2'?` ${c.dataset.label}: ${c.parsed.y} units`:` ${c.dataset.label}: $${c.parsed.y.toFixed(2)}`}}
     },
     scales:{
       x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:12},grid:{color:CHART_DEFAULTS.gridColor}},
       y:{position:'left',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(2)},grid:{color:CHART_DEFAULTS.gridColor}},
-      y2:{display:hasAm,position:'right',ticks:{color:'#7a9ab0',font:CHART_DEFAULTS.tickFont,callback:v=>v+' u'},grid:{drawOnChartArea:false}}
+      y2:{display:hasAm,position:'right',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>v+' u'},grid:{drawOnChartArea:false}}
     }
   }});
 }
@@ -594,8 +609,10 @@ function renderSvcChart(services){
       labels,
       datasets:[{
         data,
-        backgroundColor:entries.map((_,i)=>PAL[i%PAL.length]+'bb'),
-        borderColor:entries.map((_,i)=>PAL[i%PAL.length]),
+        // One series, one color (dataviz: never re-encode a nominal ranking
+        // by value — that's the bar length's job already).
+        backgroundColor:PAL[0]+'bb',
+        borderColor:PAL[0],
         borderWidth:1,borderRadius:2
       }]
     },
@@ -603,9 +620,7 @@ function renderSvcChart(services){
       indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
-        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-          titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+        tooltip:{...TT,
           callbacks:{
             title:items=>entries[items[0].dataIndex][0],
             label:c=>` ${fmt(c.parsed.x)}`
@@ -613,7 +628,7 @@ function renderSvcChart(services){
       },
       scales:{
         x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(0)},grid:{color:CHART_DEFAULTS.gridColor}},
-        y:{ticks:{color:CHART_DEFAULTS.tickColor,font:{family:'IBM Plex Mono',size:10}},grid:{display:false}}
+        y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{display:false}}
       }
     }
   });
@@ -630,8 +645,8 @@ function renderProjectChart(projects){
       labels:entries.map(([p])=>p),
       datasets:[{
         data:entries.map(([,c])=>c),
-        backgroundColor:entries.map((_,i)=>PAL[i%PAL.length]+'bb'),
-        borderColor:entries.map((_,i)=>PAL[i%PAL.length]),
+        backgroundColor:PAL[0]+'bb',
+        borderColor:PAL[0],
         borderWidth:1,borderRadius:2
       }]
     },
@@ -639,14 +654,12 @@ function renderProjectChart(projects){
       indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
-        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-          titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+        tooltip:{...TT,
           callbacks:{label:c=>` ${fmt(c.parsed.x)}`}}
       },
       scales:{
         x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(0)},grid:{color:CHART_DEFAULTS.gridColor}},
-        y:{ticks:{color:CHART_DEFAULTS.tickColor,font:{family:'IBM Plex Mono',size:10}},grid:{display:false}}
+        y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{display:false}}
       }
     }
   });
@@ -654,7 +667,7 @@ function renderProjectChart(projects){
 
 function renderCostPerStation(){
   const panel=document.getElementById('cost-per-station-panel');
-  if(!_summaryData||!_monthlyData||!_monthlyData.length){panel.style.display='none';return;}
+  if(!_summaryData||!_dailySeries||!_dailySeries.length){panel.style.display='none';return;}
   // Build monthly cost totals across all projects
   const monthlyCost={};
   Object.values(_summaryData.projects).forEach(p=>{
@@ -662,35 +675,103 @@ function renderCostPerStation(){
       monthlyCost[mk]=(monthlyCost[mk]||0)+c;
     });
   });
-  // Match with AudioMoth monthly active unit counts
+  // Average daily active-unit counts into a per-month figure (matches the
+  // "AudioMoth units" trend overlay). _monthlyData.active_units is a union of
+  // every unit seen at any point in the month, which saturates near the full
+  // fleet size and understates cost-per-station — see backend/app.py's
+  // avg_active_units() comment for the same issue in /api/ampi/costs.
+  const unitsByMonth={};
+  _dailySeries.forEach(d=>{
+    const mk=d.date.slice(0,7);
+    (unitsByMonth[mk]=unitsByMonth[mk]||[]).push(d.active_units);
+  });
+  const monthlyUnits={};
+  Object.entries(unitsByMonth).forEach(([mk,vals])=>{
+    monthlyUnits[mk]=Math.round(vals.reduce((s,v)=>s+v,0)/vals.length);
+  });
+  // Match with AudioMoth average-daily active unit counts
   const points=[];
-  _monthlyData.forEach(m=>{
-    if(monthlyCost[m.month]&&m.active_units>0){
-      points.push({month:m.month,cps:monthlyCost[m.month]/m.active_units,units:m.active_units});
+  Object.keys(monthlyUnits).sort().forEach(mk=>{
+    const units=monthlyUnits[mk];
+    if(monthlyCost[mk]&&units>0){
+      points.push({month:mk,cps:monthlyCost[mk]/units,units,cost:monthlyCost[mk]});
     }
   });
+  renderCostProjection(points);
   if(!points.length){panel.style.display='none';return;}
   panel.style.display='block';
   const avgMonthly=points.reduce((s,p)=>s+p.cps,0)/points.length;
   // Prepend stat to panel-head
   const head=panel.querySelector('.panel-head');
   head.innerHTML=`<span class="panel-title">Monthly Cost per Active Station</span>
-    <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">avg <strong style="color:#fff">${fmt(avgMonthly)}</strong>/station/mo · <strong style="color:#fff">${fmt(avgMonthly*12)}</strong>/station/yr</span>`;
+    <span class="text-muted" style="font-size:0.75rem">avg <strong style="color:var(--motus-dark)">${fmt(avgMonthly)}</strong>/station/mo · <strong style="color:var(--motus-dark)">${fmt(avgMonthly*12)}</strong>/station/yr</span>`;
   if(cpsChart){cpsChart.destroy();cpsChart=null;}
   const ctx=document.getElementById('cps-chart').getContext('2d');
   cpsChart=new Chart(ctx,{type:'bar',data:{
     labels:points.map(p=>fmtMonth(p.month)),
     datasets:[{label:'Cost per station',data:points.map(p=>+p.cps.toFixed(2)),
-      backgroundColor:'#00d4ff44',borderColor:'#00d4ff',borderWidth:1,borderRadius:2}]
+      backgroundColor:PAL[0]+'44',borderColor:PAL[0],borderWidth:1,borderRadius:2}]
   },options:{
     responsive:true,maintainAspectRatio:false,
     plugins:{legend:{display:false},
-      tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-        titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-        titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+      tooltip:{...TT,
         callbacks:{label:c=>` ${fmt(c.parsed.y)} / station (${points[c.dataIndex].units} active)`}}},
     scales:{
       x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{color:CHART_DEFAULTS.gridColor}},
+      y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(2)},grid:{color:CHART_DEFAULTS.gridColor}}
+    }
+  }});
+}
+
+// Fit monthly total cost as a straight line against average active stations
+// (cost = fixed + perStation*stations) via least squares, then derive the
+// cost-per-station curve (fixed/N + perStation) that the fixed-cost component
+// drives toward an asymptote as N grows — the "floor" a bigger fleet can't
+// get under, since AWS Cost Explorer only gives us a handful of distinct
+// fleet-size months, not the engineering breakdown behind the number.
+function renderCostProjection(points){
+  const panel=document.getElementById('cost-projection-panel');
+  const distinctUnits=new Set(points.map(p=>p.units));
+  if(points.length<3||distinctUnits.size<2){panel.style.display='none';return;}
+  const n=points.length;
+  const sumX=points.reduce((s,p)=>s+p.units,0), sumY=points.reduce((s,p)=>s+p.cost,0);
+  const sumXY=points.reduce((s,p)=>s+p.units*p.cost,0), sumXX=points.reduce((s,p)=>s+p.units*p.units,0);
+  const denom=n*sumXX-sumX*sumX;
+  if(!denom){panel.style.display='none';return;}
+  let perStation=(n*sumXY-sumX*sumY)/denom;
+  let fixed=(sumY-perStation*sumX)/n;
+  if(perStation<0){ // noisy history gave a downward slope — fall back to "all cost is shared"
+    perStation=0; fixed=sumY/n;
+  }
+  const minUnits=Math.min(...points.map(p=>p.units)), maxUnits=Math.max(...points.map(p=>p.units));
+  const xLo=Math.max(1,Math.floor(minUnits*0.5)), xHi=Math.max(300,Math.ceil(maxUnits*1.75));
+  const steps=60, curve=[];
+  for(let i=0;i<=steps;i++){
+    const x=Math.round(xLo+(xHi-xLo)*i/steps);
+    curve.push({x,y:+(fixed/x+perStation).toFixed(2)});
+  }
+  panel.style.display='block';
+  const head=panel.querySelector('.panel-head');
+  head.innerHTML=`<span class="panel-title">Cost per Station vs Fleet Size</span>
+    <span class="text-muted" style="font-size:0.75rem">fixed <strong style="color:var(--motus-dark)">${fmt(fixed)}</strong>/mo shared · floor <strong style="color:var(--motus-dark)">${fmt(perStation)}</strong>/station/mo as fleet grows</span>`;
+  if(costProjChart){costProjChart.destroy();costProjChart=null;}
+  const ctx=document.getElementById('cost-projection-chart').getContext('2d');
+  costProjChart=new Chart(ctx,{type:'line',data:{datasets:[
+    {label:'Projected',data:curve,borderColor:cssVar('--motus-muted'),borderDash:[4,3],borderWidth:1.5,
+      pointRadius:0,pointHoverRadius:4,pointHitRadius:10,fill:false,tension:0.15},
+    {type:'scatter',label:'Observed months',data:points.map(p=>({x:p.units,y:+p.cps.toFixed(2),month:p.month})),
+      backgroundColor:PAL[0],borderColor:PAL[0],pointRadius:4,pointHoverRadius:6}
+  ]},options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'nearest',axis:'x',intersect:false},
+    plugins:{legend:{display:true,position:'top',labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:12}},
+      tooltip:{...TT,
+        callbacks:{label:c=>c.dataset.label==='Observed months'
+          ? ` ${fmtMonth(c.raw.month)}: ${fmt(c.parsed.y)} / station (${c.raw.x} active)`
+          : ` projected ${fmt(c.parsed.y)} / station at ${c.parsed.x} stations`}}},
+    scales:{
+      x:{type:'linear',title:{display:true,text:'Active stations',color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},
+        ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{color:CHART_DEFAULTS.gridColor}},
       y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(2)},grid:{color:CHART_DEFAULTS.gridColor}}
     }
   }});
@@ -763,8 +844,8 @@ function restoreAmContent(){
       <div class="panel-head">
         <span class="panel-title" id="hm-title">${_hmMode==='units'?'Active Units Per Day':'Data Uploaded Per Day (GB)'}</span>
         <div class="hm-toggle">
-          <button class="hm-toggle-btn ${_hmMode==='units'?'active':''}" onclick="setHmMode('units',this)">Units</button>
-          <button class="hm-toggle-btn ${_hmMode==='gb'?'active':''}" onclick="setHmMode('gb',this)">GB / day</button>
+          <button class="btn btn-light btn-sm hm-toggle-btn ${_hmMode==='units'?'active':''}" onclick="setHmMode('units',this)">Units</button>
+          <button class="btn btn-light btn-sm hm-toggle-btn ${_hmMode==='gb'?'active':''}" onclick="setHmMode('gb',this)">GB / day</button>
         </div>
       </div>
       <div class="panel-body">
@@ -782,13 +863,13 @@ function restoreAmContent(){
     </div>
     <div class="panel">
       <div class="panel-head"><span class="panel-title">Station Locations</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="map-status-label"></span>
+        <span class="text-muted" style="font-size:0.75rem" id="map-status-label"></span>
       </div>
       <div id="am-map"></div>
       <div class="unit-detail-panel" id="unit-detail-panel">
         <div class="unit-detail-header">
           <span class="unit-detail-title" id="unit-detail-title">—</span>
-          <button class="unit-detail-close" onclick="closeUnitDetail()">Clear</button>
+          <button class="btn btn-light btn-sm" onclick="closeUnitDetail()">Clear</button>
         </div>
         <div class="detail-chart-wrap"><canvas id="detail-chart"></canvas></div>
       </div>
@@ -796,7 +877,7 @@ function restoreAmContent(){
     <div class="grid2">
       <div class="panel"><div class="panel-head"><span class="panel-title">Monthly Summary</span></div>
         <div class="panel-body" style="padding:0">
-          <table class="mo-table"><thead><tr><th>Month</th><th>Units Active</th><th>Recordings</th><th>Data</th></tr></thead>
+          <table class="table table-striped table-hover mo-table"><thead><tr><th>Month</th><th>Units Active</th><th>Recordings</th><th>Data</th></tr></thead>
           <tbody id="mo-tbody"></tbody></table>
         </div>
       </div>
@@ -807,14 +888,14 @@ function restoreAmContent(){
     <div class="panel">
       <div class="panel-head">
         <span class="panel-title">Unit Registry</span>
-        <div style="display:flex;align-items:center;gap:12px">
-          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="unit-count-label"></span>
-          <button class="range-btn" onclick="downloadUnitsJson()" title="Download units as JSON">↓ JSON</button>
-          <button class="rescan-btn ${_authed?'':'locked'}" id="rescan-btn" onclick="tryRescan()">↺ RESCAN</button>
+        <div class="d-flex align-center gap-2">
+          <span class="text-muted" style="font-size:0.75rem" id="unit-count-label"></span>
+          <button class="btn btn-light btn-sm" onclick="downloadUnitsJson()" title="Download units as JSON">&#8595; JSON</button>
+          <button class="btn btn-light btn-sm rescan-btn ${_authed?'':'locked'}" id="rescan-btn" onclick="tryRescan()">&#8635; Rescan</button>
         </div>
       </div>
       <div style="overflow-x:auto">
-        <table class="unit-table" id="unit-table">
+        <table class="table table-hover unit-table" id="unit-table">
           <thead><tr>
             <th class="sortable" onclick="sortTable('unit')">Unit</th>
             <th class="sortable" onclick="sortTable('status')">Status</th>
@@ -854,16 +935,17 @@ function setHmMode(mode,btn){
   renderHeatmap();
 }
 
-function hmColorUnits(val,max){
-  if(val===0) return '#111820';
-  const t=val/max;
-  if(t<0.2) return '#0d3a2a';if(t<0.4) return '#0d6644';if(t<0.7) return '#1a9e6a';return '#3dffa0';
+// Sequential encoding = one hue, light→dark, mixed at runtime from the brand
+// token rather than a hardcoded ramp — Units uses --motus-primary (green),
+// GB uses --motus-secondary (blue), so the two heatmap modes stay visually
+// distinct while both stay on-brand.
+function hmMix(hueVar,t){
+  if(t<=0) return 'var(--motus-light)';
+  const pct=t<0.2?30:t<0.4?50:t<0.7?72:96;
+  return `color-mix(in oklch, var(${hueVar}) ${pct}%, white)`;
 }
-function hmColorGb(val,max){
-  if(val===0) return '#111820';
-  const t=val/max;
-  if(t<0.2) return '#1a1a3a';if(t<0.4) return '#2a2a7a';if(t<0.7) return '#4444bb';return '#b57aff';
-}
+function hmColorUnits(val,max){return hmMix('--motus-primary',val/max);}
+function hmColorGb(val,max){return hmMix('--motus-secondary',val/max);}
 
 function renderHeatmap(){
   const daily=_dailySeries;
@@ -927,7 +1009,7 @@ function renderHeatmap(){
       ?[0,max*0.2,max*0.4,max*0.7,max]
       :[0,Math.round(max*0.2),Math.round(max*0.4),Math.round(max*0.7),Math.round(max)];
     const labels=thresholds.map(v=>isGb?v.toFixed(1)+' GB':v+(v===1?' unit':' units'));
-    const colors=isGb?['#111820','#1a1a3a','#2a2a7a','#4444bb','#b57aff']:['#111820','#0d3a2a','#0d6644','#1a9e6a','#3dffa0'];
+    const colors=thresholds.map(v=>isGb?hmColorGb(v,max):hmColorUnits(v,max));
     legendEl.innerHTML='<span style="margin-right:4px">Less</span>'+labels.map((s,i)=>`<div class="hm-swatch" style="background:${colors[i]}" title="${s}"></div>`).join('')+'<span style="margin-left:4px">More</span>';
   }
 }
@@ -935,7 +1017,7 @@ function renderHeatmap(){
 function renderMonthlyTable(monthly){
   if(!monthly||!monthly.length) return;
   document.getElementById('mo-tbody').innerHTML=monthly.slice().reverse().map(m=>
-    `<tr><td style="color:#fff">${fmtMonth(m.month)}</td><td style="color:var(--green)">${m.active_units}</td><td>${m.total_files.toLocaleString()}</td><td>${fmtBytes(m.total_bytes)}</td></tr>`).join('');
+    `<tr><td>${fmtMonth(m.month)}</td><td style="color:var(--motus-primary)">${m.active_units}</td><td>${m.total_files.toLocaleString()}</td><td>${fmtBytes(m.total_bytes)}</td></tr>`).join('');
 }
 
 function renderVolumeChart(daily){
@@ -945,11 +1027,9 @@ function renderVolumeChart(daily){
   const labels=daily.map(d=>fmtDate(d.date));
   const data=daily.map(d=>+(d.volume_bytes/1e9).toFixed(3));
   volumeChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'GB uploaded',data,
-    backgroundColor:'#b57aff33',borderColor:'#b57aff',borderWidth:1,borderRadius:2}]},
+    backgroundColor:cssVar('--motus-secondary')+'33',borderColor:cssVar('--motus-secondary'),borderWidth:1,borderRadius:2}]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-        titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-        titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+      plugins:{legend:{display:false},tooltip:{...TT,
         callbacks:{label:c=>` ${c.parsed.y.toFixed(3)} GB`}}},
       scales:{
         x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:12},grid:{display:false}},
@@ -1003,8 +1083,8 @@ function updateMapTooltips(){
     const serno=loc.am_serno?`<br>AM: ${loc.am_serno}`:'';
     const pi=loc.pi_serno?`<br>Pi: ${loc.pi_serno}`:'';
     const cost=unitTotalCost(loc.unit);
-    const costStr=cost!=null?`<br><span style="color:#ffb830">${fmt(cost)} est. total</span>`:'';
-    marker.setTooltipContent(`<span style="font-family:monospace;font-size:12px">${loc.unit}${serno}${pi}<br>${loc.total_files.toLocaleString()} recordings · ${loc.active_days}d active${costStr}</span>`);
+    const costStr=cost!=null?`<br><span style="color:var(--motus-warning)">${fmt(cost)} est. total</span>`:'';
+    marker.setTooltipContent(`<span style="font-family:var(--motus-font);font-size:12px">${loc.unit}${serno}${pi}<br>${loc.total_files.toLocaleString()} recordings · ${loc.active_days}d active${costStr}</span>`);
   });
 }
 
@@ -1023,14 +1103,8 @@ function initMap(){
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom:19,
-    className:'map-tiles'
+    maxZoom:19
   }).addTo(_map);
-
-  // Dark tile style via CSS
-  const style=document.createElement('style');
-  style.textContent=`.map-tiles{filter:brightness(0.55) contrast(1.2) saturate(0.7) hue-rotate(180deg);}`;
-  document.head.appendChild(style);
 
   const sevenAgo=new Date();sevenAgo.setDate(sevenAgo.getDate()-7);
   const sevenStr=sevenAgo.toISOString().slice(0,10);
@@ -1043,10 +1117,10 @@ function initMap(){
   const bounds=[];
   _locData.forEach(loc=>{
     const active=loc.last_seen>=sevenStr;
-    const color=active?'#3dffa0':'#3d5470';
+    const color=active?cssVar('--motus-success'):cssVar('--motus-muted');
     const icon=L.divIcon({
       className:'',
-      html:`<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid #0c1118;box-shadow:0 0 ${active?'8px '+color:'none'}"></div>`,
+      html:`<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid var(--motus-white);box-shadow:0 0 ${active?'8px '+color:'none'}"></div>`,
       iconSize:[10,10],iconAnchor:[5,5]
     });
     const marker=L.marker([loc.lat,loc.lon],{icon}).addTo(_map);
@@ -1090,11 +1164,11 @@ function updateMarkerStyle(unitName,selected,active){
   const sevenStr=sevenAgo.toISOString().slice(0,10);
   const loc=_locData.find(l=>l.unit===unitName);
   const isActive=loc?loc.last_seen>=sevenStr:false;
-  const color=selected?'#ffb830':(isActive?'#3dffa0':'#3d5470');
+  const color=selected?cssVar('--motus-warning'):(isActive?cssVar('--motus-success'):cssVar('--motus-muted'));
   const size=selected?14:10;
   marker.setIcon(L.divIcon({
     className:'',
-    html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #0c1118;box-shadow:0 0 ${selected?'10px '+color:(isActive?'8px '+color:'none')}"></div>`,
+    html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid var(--motus-white);box-shadow:0 0 ${selected?'10px '+color:(isActive?'8px '+color:'none')}"></div>`,
     iconSize:[size,size],iconAnchor:[size/2,size/2]
   }));
 }
@@ -1144,20 +1218,18 @@ async function loadUnitDetail(unitName){
       return (totM>0&&d.bytes>0)?ampiM*(d.bytes/totM):null;
     }):null;
     const datasets=[
-      {label:'Recordings',data:counts,backgroundColor:'#3dffa044',borderColor:'#3dffa0',borderWidth:1,borderRadius:2,yAxisID:'y'},
-      {label:'GB',data:bytes,backgroundColor:'#b57aff44',borderColor:'#b57aff',borderWidth:1,borderRadius:2,yAxisID:'y2',type:'bar'}
+      {label:'Recordings',data:counts,backgroundColor:cssVar('--motus-primary')+'44',borderColor:cssVar('--motus-primary'),borderWidth:1,borderRadius:2,yAxisID:'y'},
+      {label:'GB',data:bytes,backgroundColor:cssVar('--motus-secondary')+'44',borderColor:cssVar('--motus-secondary'),borderWidth:1,borderRadius:2,yAxisID:'y2',type:'bar'}
     ];
     if(costData) datasets.push({label:'Unit cost/day',data:costData,
-      borderColor:'#ffb830',borderWidth:2,pointRadius:0,tension:0.3,fill:false,
+      borderColor:cssVar('--motus-warning'),borderWidth:2,pointRadius:0,tension:0.3,fill:false,
       type:'line',yAxisID:'y3',spanGaps:true});
     const ctx=canvas.getContext('2d');
     detailChart=new Chart(ctx,{type:'bar',data:{labels,datasets},options:{
       responsive:true,maintainAspectRatio:false,
       interaction:{mode:'index',intersect:false},
       plugins:{legend:{labels:{color:CHART_DEFAULTS.legendColor,font:CHART_DEFAULTS.legendFont,boxWidth:10,padding:10}},
-        tooltip:{backgroundColor:'#0c1118',borderColor:'#1a2535',borderWidth:1,
-          titleColor:CHART_DEFAULTS.titleColor,bodyColor:CHART_DEFAULTS.bodyColor,
-          titleFont:CHART_DEFAULTS.titleFont,bodyFont:CHART_DEFAULTS.bodyFont,
+        tooltip:{...TT,
           callbacks:{label:c=>{
             if(c.dataset.yAxisID==='y3') return c.parsed.y!=null?` Unit cost: $${c.parsed.y.toFixed(4)}`:null;
             if(c.dataset.yAxisID==='y2') return ` ${c.parsed.y.toFixed(3)} GB`;
@@ -1167,7 +1239,7 @@ async function loadUnitDetail(unitName){
         x:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,maxTicksLimit:16},grid:{display:false}},
         y:{ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont},grid:{color:CHART_DEFAULTS.gridColor},title:{display:true,text:'Recordings',color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont}},
         y2:{position:'right',ticks:{color:CHART_DEFAULTS.tickColor,font:CHART_DEFAULTS.tickFont,callback:v=>v+'GB'},grid:{drawOnChartArea:false}},
-        y3:{display:costData!=null,position:'right',offset:true,ticks:{color:'#ffb830',font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(3)},grid:{drawOnChartArea:false}}
+        y3:{display:costData!=null,position:'right',offset:true,ticks:{color:cssVar('--motus-warning'),font:CHART_DEFAULTS.tickFont,callback:v=>'$'+v.toFixed(3)},grid:{drawOnChartArea:false}}
       }
     }});
   }catch(e){title.textContent=unitName+' · Error loading detail';}
@@ -1217,17 +1289,17 @@ function renderUnitTable(){
   const hasCoords=new Set(_locData.map(l=>l.unit));
   document.getElementById('unit-tbody').innerHTML=sorted.map(u=>{
     const active=u.last_seen>=sevenStr,pct=(u.total_bytes/maxB*100).toFixed(1);
-    const mapPin=hasCoords.has(u.unit)?`<span style="color:var(--accent);margin-left:6px" title="Location on map">⊙</span>`:'';
+    const mapPin=hasCoords.has(u.unit)?`<span style="color:var(--motus-secondary);margin-left:6px" title="Location on map">⊙</span>`:'';
     const sel=_selectedUnit===u.unit?' selected':'';
     const cost=showCost?unitTotalCost(u.unit):null;
-    const costTd=showCost?`<td style="color:var(--amber)">${cost!=null?fmt(cost):'—'}</td>`:'<td style="display:none"></td>';
+    const costTd=showCost?`<td style="color:var(--motus-warning)">${cost!=null?fmt(cost):'—'}</td>`:'<td style="display:none"></td>';
     return`<tr class="${sel}" data-unit="${u.unit}" onclick="selectUnit('${u.unit.replace(/'/g,"\\'")}')">
-      <td style="color:#fff;font-weight:500">${u.unit}${mapPin}</td>
-      <td><span class="status-dot ${active?'active':'inactive'}"></span><span style="font-size:11px;color:${active?'var(--green)':'var(--muted)'}">${active?'Active':'Inactive'}</span></td>
-      <td style="color:var(--muted)">${u.first_seen?fmtDate(u.first_seen):'—'}</td>
-      <td style="color:var(--muted)">${u.last_seen?fmtDate(u.last_seen):'—'}</td>
+      <td style="font-weight:600">${u.unit}${mapPin}</td>
+      <td><span class="status-dot ${active?'active':'inactive'}"></span><span style="font-size:11px;color:${active?'var(--motus-success)':'var(--motus-muted)'}">${active?'Active':'Inactive'}</span></td>
+      <td class="text-muted">${u.first_seen?fmtDate(u.first_seen):'—'}</td>
+      <td class="text-muted">${u.last_seen?fmtDate(u.last_seen):'—'}</td>
       <td>${u.active_days}d</td><td>${u.total_files.toLocaleString()}</td>
-      <td><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%"></div></div><span style="color:var(--text);white-space:nowrap">${fmtBytes(u.total_bytes)}</span></div></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%"></div></div><span style="white-space:nowrap">${fmtBytes(u.total_bytes)}</span></div></td>
       ${costTd}
     </tr>`;}).join('');
 }
@@ -1237,5 +1309,10 @@ function renderUnitTable(){
 // fetch (gated on _authed) doesn't race a still-pending auth check.
 (async()=>{ await checkAuth(); loadAudioMoth(); })();
 </script>
+<footer class="tool-footer">
+  <img class="tool-footer-logo tool-footer-logo-motus" src="/shared/img/motus-logo-stacked.png" alt="Motus">
+  <img class="tool-footer-logo tool-footer-logo-birds-canada" src="/shared/img/birds-canada-logo-stacked.png" alt="Birds Canada">
+</footer>
+<script src="/shared/motus-account.js"></script>
 </body>
 </html>

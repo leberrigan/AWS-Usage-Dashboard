@@ -139,6 +139,46 @@ your tool.
    `manifest.json`'s `gated` flag, or anything about the outer login gate.
    None of that changes — you're only swapping what happens *after*
    someone's already authenticated.
+   
+## Deploying your change to the box
+
+Don't `git pull` or bare `pip install` on the box itself — it's not a git
+checkout (no `git` binary is even installed there), and it only ever
+receives files pushed to it. Two things trip people up every time:
+
+- **Push files, don't pull a repo.** From your own machine, `scp` the
+  changed backend file(s) to `/opt/tools/<your-slug>/` (or `/backend/` or
+  `/web/` underneath it, whichever your tool already uses — check what's
+  there with `ssh ... "ls /opt/tools/<your-slug>/"` if unsure). There's no
+  CI/CD wired up yet for most tools, so this manual push is the actual
+  deploy step, not a placeholder for one.
+- **Install into the tool's own venv, not system Python.** Every tool has
+  its own venv at `/opt/tools/<your-slug>/venv/` (or a `web/venv` alongside
+  its app code — again, check). Running bare `pip install` as `ec2-user`
+  silently falls back to a user-level install that the systemd service
+  (which runs as the `nginx` user) can never see — `httpx` (or whatever new
+  dependency your change adds) will import-error at runtime even though
+  `pip install` appeared to succeed. Always install with the venv's own
+  pip binary explicitly:
+
+  ```
+  sudo /opt/tools/<your-slug>/venv/bin/pip install -r /opt/tools/<your-slug>/<web-or-backend>/requirements.txt
+  ```
+
+- **Restart your tool's actual unit name**, not a guessed one — it's
+  `tool-<your-slug>` (e.g. `tool-burst-finder`, `tool-asset-management`),
+  matching the `.service` file in this ops repo's `infra/systemd/`:
+
+  ```
+  sudo systemctl restart tool-<your-slug>
+  sudo systemctl status tool-<your-slug> --no-pager -l | head -10
+  ```
+
+If any of this doesn't match what you find on the box for your specific
+tool, that's a sign to stop and ask rather than improvise — the deploy
+mechanism is intentionally uniform across tools, so a mismatch usually
+means you're looking at the wrong path/unit name, not that your tool is
+special.
 
 ## Verifying it worked
 
